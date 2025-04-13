@@ -9,9 +9,8 @@ pub async fn get_meta_from_path(path: &str) -> Option<(Uuid, FileMeta)> {
 	Some((uuid, meta))
 }
 
-pub async fn get_meta_from_uuid(uuid: Uuid) -> FileMeta {
-	let meta: FileMeta = toml::from_str(&fs::read_to_string(format!("data/{uuid}/meta.toml")).unwrap()).unwrap();
-	meta
+pub async fn get_meta_from_uuid(uuid: Uuid) -> Option<FileMeta> {
+	toml::from_str(&fs::read_to_string(format!("data/{uuid}/meta.toml")).ok()?).ok()?
 }
 
 pub(crate) mod error_compat {

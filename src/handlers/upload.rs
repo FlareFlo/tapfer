@@ -7,6 +7,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 use crate::file_meta::FileMeta;
+use crate::util::error_compat::InternalServerErrorExt;
 
 pub async fn accept_form(multipart: Multipart) -> Result<impl IntoResponse, StatusCode> {
     let uuid = Uuid::new_v4();
@@ -15,7 +16,7 @@ pub async fn accept_form(multipart: Multipart) -> Result<impl IntoResponse, Stat
 
     let res = do_upload(multipart, &out_dir).await;
     if res.is_err() {
-        delete_asset(uuid).await;
+        delete_asset(uuid).await.ise()?;
     }
     res?;
 
@@ -24,13 +25,9 @@ pub async fn accept_form(multipart: Multipart) -> Result<impl IntoResponse, Stat
 
 async fn do_upload(mut multipart: Multipart, out_dir: &str) -> Result<impl IntoResponse, StatusCode> {
     while let Some(mut field) = multipart.next_field().await.unwrap() {
-        let name = field.name().unwrap().to_string();
+        // let name = field.name().unwrap().to_string();
         let file_name = field.file_name().unwrap().to_string();
         let content_type = field.content_type().unwrap().to_string();
-
-        println!(
-            "`{name}` (`{file_name}`: `{content_type}`)",
-        );
 
         let mut metadata = FileMeta::default_policy(file_name.clone(), content_type.clone());
         let mut f = File::create(format!("{out_dir}/{file_name}")).await.unwrap();

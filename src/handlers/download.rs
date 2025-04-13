@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 use tokio::fs;
 use tokio::io::BufReader;
 use tokio_util::io::ReaderStream;
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 use crate::file_meta::FileMeta;
 use crate::retention_control::delete_asset;
@@ -28,7 +28,7 @@ pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse
 		return Err(StatusCode::NOT_FOUND);
 	}
 	
-	let (uuid, meta) = get_meta_from_path(&path).await.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+	let (uuid, meta) = get_meta_from_path(&path).await.ise()?;
 	let toml = toml::to_string_pretty(&meta).ise()?;
 
 	let template = DownloadTemplate {
@@ -89,7 +89,10 @@ impl<S: Send> Drop for CleanupStream<S> {
 		tokio::spawn(async move {
 			if meta.remove_after_download() {
 				debug!("Removing {uuid} after download");
-				delete_asset(uuid).await;
+				let res = delete_asset(uuid).await;
+				if res.is_none() {
+					error!("Failed to delete {uuid}")
+				}
 			}
 		});
 	}

@@ -23,13 +23,16 @@ impl Default for GlobalRetentionPolicy {
 	}
 }
 
-pub async fn check_against_global_retention(uuid: Uuid, now: UtcDateTime) {
-	let meta = get_meta_from_uuid(uuid).await;
+#[must_use]
+pub async fn check_against_global_retention(uuid: Uuid, now: UtcDateTime) -> Option<()> {
+	let meta = get_meta_from_uuid(uuid).await?;
 	if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
-		delete_asset(uuid).await;
+		delete_asset(uuid).await?;
 	}
+	Some(())
 }
 
-pub async fn delete_asset(asset: Uuid) {
-	fs::remove_dir_all(format!("data/{asset}")).await.unwrap();
+#[must_use]
+pub async fn delete_asset(asset: Uuid) -> Option<()> {
+	fs::remove_dir_all(format!("data/{asset}")).await.ok()
 }

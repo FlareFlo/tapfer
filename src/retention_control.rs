@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
 use uuid::Uuid;
-use crate::util::get_meta_from_uuid;
+use crate::file_meta::FileMeta;
 
 static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> = LazyLock::new(|| {
 	GlobalRetentionPolicy::default()
@@ -25,7 +25,7 @@ impl Default for GlobalRetentionPolicy {
 
 #[must_use]
 pub async fn check_against_global_retention(uuid: Uuid, now: UtcDateTime) -> Option<()> {
-	let meta = get_meta_from_uuid(uuid).await?;
+	let meta = FileMeta::read_from_uuid(uuid).await?;
 	if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
 		delete_asset(uuid).await?;
 	}

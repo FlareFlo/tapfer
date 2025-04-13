@@ -1,4 +1,7 @@
+use tokio::fs;
+use std::str::FromStr;
 use time::{Duration, UtcDateTime};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FileMeta {
@@ -34,6 +37,16 @@ impl FileMeta {
 			}
 			_ => false,
 		}
+	}
+
+	pub async fn read_from_path(path: &str) -> Option<(Uuid, Self)> {
+		let uuid = Uuid::from_str(path).ok()?;
+		let meta: FileMeta = toml::from_str(&fs::read_to_string(format!("data/{uuid}/meta.toml")).await.ok()?).ok()?;
+		Some((uuid, meta))
+	}
+
+	pub async fn read_from_uuid(uuid: Uuid) -> Option<Self> {
+		toml::from_str(&std::fs::read_to_string(format!("data/{uuid}/meta.toml")).ok()?).ok()?
 	}
 
 	pub fn add_size(&mut self, extra: u64) {

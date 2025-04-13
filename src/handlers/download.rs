@@ -13,7 +13,6 @@ use tracing::{debug, error};
 use uuid::Uuid;
 use crate::file_meta::FileMeta;
 use crate::retention_control::delete_asset;
-use crate::util::get_meta_from_path;
 use crate::util::error_compat::InternalServerErrorExt;
 
 #[derive(Template)]
@@ -28,7 +27,7 @@ pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse
 		return Err(StatusCode::NOT_FOUND);
 	}
 	
-	let (uuid, meta) = get_meta_from_path(&path).await.ise()?;
+	let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
 	let toml = toml::to_string_pretty(&meta).ise()?;
 
 	let template = DownloadTemplate {
@@ -42,7 +41,7 @@ pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse
 }
 
 pub async fn download_file(Path(path): Path<String>) -> Result<impl IntoResponse, StatusCode> {
-	let (uuid, meta) = get_meta_from_path(&path).await.ise()?;
+	let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
 
 	let mut headers = HeaderMap::new();
 	headers.insert(

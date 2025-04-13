@@ -1,3 +1,4 @@
+use crate::retention_control::delete_asset;
 use axum::extract::Multipart;
 use axum::response::{IntoResponse, Redirect};
 use axum::http::StatusCode;
@@ -14,7 +15,7 @@ pub async fn accept_form(multipart: Multipart) -> Result<impl IntoResponse, Stat
 
     let res = do_upload(multipart, &out_dir).await;
     if res.is_err() {
-        fs::remove_dir_all(&out_dir).await.unwrap();
+        delete_asset(uuid).await;
     }
     res?;
 

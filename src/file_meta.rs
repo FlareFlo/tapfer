@@ -1,6 +1,6 @@
 use time::{Duration, UtcDateTime};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FileMeta {
 	name: String,
 	size: u64,
@@ -8,7 +8,7 @@ pub struct FileMeta {
 	removal_policy: RemovalPolicy,
 	mimetype: String,
 }
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum RemovalPolicy {
 	SingleDownload,
 	Expiry {
@@ -26,6 +26,16 @@ impl FileMeta {
 			mimetype,
 		}
 	}
+
+	pub fn remove_after_download(&self) -> bool {
+		match self.removal_policy {
+			RemovalPolicy::SingleDownload => {
+				true
+			}
+			_ => false,
+		}
+	}
+
 	pub fn add_size(&mut self, extra: u64) {
 		self.size += extra;
 	}
@@ -37,5 +47,8 @@ impl FileMeta {
 	}
 	pub fn size(&self) -> u64 {
 		self.size
+	}
+	pub fn created(&self) -> UtcDateTime {
+		self.created
 	}
 }

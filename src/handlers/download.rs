@@ -1,22 +1,20 @@
-use std::sync::Mutex;
 use std::pin::Pin;
-use axum::body::Bytes;
-use std::str::FromStr;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
-use axum::http::{header, HeaderMap, HeaderValue};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse};
 use futures_util::StreamExt;
+use tokio::fs;
+use tokio::io::BufReader;
 use tokio_util::io::ReaderStream;
 use tracing::debug;
 use uuid::Uuid;
 use crate::file_meta::FileMeta;
 use crate::retention_control::delete_asset;
-use crate::util;
 use crate::util::get_meta_from_path;
+use crate::util::error_compat::InternalServerErrorExt;
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -25,42 +23,46 @@ struct DownloadTemplate<'a> {
 	download_url: &'a str,
 }
 
-pub async fn download_html(Path(path): Path<String>) -> impl IntoResponse {
-	let (uuid, meta) = util::get_meta_from_path(&path).await;
-	let toml = toml::to_string_pretty(&meta).unwrap();
+pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse, StatusCode> {
+	if fs::try_exists(&path).await.ok() != Some(true) {
+		return Err(StatusCode::NOT_FOUND);
+	}
+	
+	let (uuid, meta) = get_meta_from_path(&path).await.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+	let toml = toml::to_string_pretty(&meta).ise()?;
 
 	let template = DownloadTemplate {
 		toml: &toml,
 		download_url: &format!("/uploads/{uuid}/download"),
 	};
 
-	Html(
-		template.render().unwrap()
-	)
+	Ok(Html(
+		template.render().ise()?
+	))
 }
 
-pub async fn download_file(Path(path): Path<String>) -> impl IntoResponse {
-	let (uuid, meta) = util::get_meta_from_path(&path).await;
+pub async fn download_file(Path(path): Path<String>) -> Result<impl IntoResponse, StatusCode> {
+	let (uuid, meta) = get_meta_from_path(&path).await.ise()?;
 
 	let mut headers = HeaderMap::new();
 	headers.insert(
 		header::CONTENT_TYPE,
-		HeaderValue::from_str(meta.content_type()).unwrap()
+		HeaderValue::from_str(meta.content_type()).ise()?
 	);
 	headers.insert(
 		header::CONTENT_DISPOSITION,
-		HeaderValue::from_str(&format!("attachment; filename=\"{}\"", meta.name())).unwrap(),
+		HeaderValue::from_str(&format!("attachment; filename=\"{}\"", meta.name())).ise()?,
 	);
 	headers.insert(
 		header::CONTENT_LENGTH,
-		HeaderValue::from_str(&meta.size().to_string()).unwrap(),
+		HeaderValue::from_str(&meta.size().to_string()).ise()?,
 	);
 
 	let path = format!("data/{uuid}/{}", meta.name());
-	let file = tokio::fs::File::open(&path).await.unwrap();
-	let stream = ReaderStream::new(file);
+	let file = tokio::fs::File::open(&path).await.ise()?;
+	let stream = ReaderStream::new(BufReader::new(file));
 	let wrapped = CleanupStream::new(stream, uuid, meta);
-	(headers, Body::from_stream(wrapped))
+	Ok((headers, Body::from_stream(wrapped)))
 }
 
 /// A stream wrapper that deletes the file when dropped

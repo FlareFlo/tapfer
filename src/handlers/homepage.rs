@@ -1,22 +1,13 @@
-use axum::response::Html;
+use askama::Template;
+use axum::response::{Html, IntoResponse};
 
-pub async fn show_form() -> Html<&'static str> {
+
+#[derive(Template)]
+#[template(path = "homepage.html")]
+pub struct Homepage;
+
+pub async fn show_form() -> impl IntoResponse {
     Html(
-        r#"
-        <!doctype html>
-        <html>
-            <head></head>
-            <body>
-                <form action="/" method="post" enctype="multipart/form-data">
-                    <label>
-                        Upload file:
-                        <input type="file" name="file" multiple>
-                    </label>
-
-                    <input type="submit" value="Upload files">
-                </form>
-            </body>
-        </html>
-        "#,
+        Homepage.render().unwrap()
     )
 }

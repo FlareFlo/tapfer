@@ -41,7 +41,7 @@ impl FileMeta {
 
 	pub async fn read_from_path(path: &str) -> Option<(Uuid, Self)> {
 		let uuid = Uuid::from_str(path).ok()?;
-		let meta: FileMeta = toml::from_str(&fs::read_to_string(format!("data/{uuid}/meta.toml")).await.ok()?).ok()?;
+		let meta: FileMeta = Self::read_from_uuid(uuid).await?;
 		Some((uuid, meta))
 	}
 

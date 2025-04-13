@@ -31,7 +31,7 @@ async fn do_upload(mut multipart: Multipart, out_dir: &str) -> Result<impl IntoR
             "`{name}` (`{file_name}`: `{content_type}`)",
         );
 
-        let mut metadata = FileMeta::default_policy(file_name.clone());
+        let mut metadata = FileMeta::default_policy(file_name.clone(), content_type.clone());
         let mut f = File::create(format!("{out_dir}/{file_name}")).await.unwrap();
         while let Some(chunk) = field.chunk().await.unwrap() {
             metadata.add_size(chunk.len() as u64);

@@ -1,13 +1,17 @@
 <!doctype html>
-<html>
-<head></head>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Upload to Tapfer</title>
+	{% include "style.html" %}
+</head>
 <body>
 <form action="/" method="post" enctype="multipart/form-data">
 	<label>
-		Upload file:
-		<input type="file" name="file" multiple>
+		Choose file to upload:
+		<input type="file" name="file">
 	</label>
-
 	<input type="submit" value="Upload files">
 </form>
 </body>

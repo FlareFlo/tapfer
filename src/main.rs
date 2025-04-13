@@ -37,7 +37,7 @@ async fn main() {
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
     // run it with hyper
-    let listener = tokio::net::TcpListener::bind("192.168.0.205:3000")
+    let listener = tokio::net::TcpListener::bind("localhost:3000")
         .await
         .unwrap();
     tracing::debug!("listening on {}", listener.local_addr().unwrap());

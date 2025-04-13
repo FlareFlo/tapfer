@@ -46,7 +46,7 @@ impl FileMeta {
 	}
 
 	pub async fn read_from_uuid(uuid: Uuid) -> Option<Self> {
-		toml::from_str(&std::fs::read_to_string(format!("data/{uuid}/meta.toml")).ok()?).ok()?
+		toml::from_str(&tokio::fs::read_to_string(format!("data/{uuid}/meta.toml")).await.ok()?).ok()?
 	}
 
 	pub fn add_size(&mut self, extra: u64) {

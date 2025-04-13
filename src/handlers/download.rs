@@ -24,7 +24,7 @@ struct DownloadTemplate<'a> {
 }
 
 pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse, StatusCode> {
-	if fs::try_exists(&path).await.ok() != Some(true) {
+	if fs::try_exists(format!("data/{path}")).await.ok() != Some(true) {
 		return Err(StatusCode::NOT_FOUND);
 	}
 	

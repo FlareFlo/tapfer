@@ -1,4 +1,4 @@
-use tokio::fs;
+use std::path::Path;
 use std::str::FromStr;
 use time::{Duration, UtcDateTime};
 use uuid::Uuid;
@@ -39,8 +39,8 @@ impl FileMeta {
 		}
 	}
 
-	pub async fn read_from_path(path: &str) -> Option<(Uuid, Self)> {
-		let uuid = Uuid::from_str(path).ok()?;
+	pub async fn read_from_path(path: impl AsRef<Path>) -> Option<(Uuid, Self)> {
+		let uuid = Uuid::from_str(path.as_ref().to_str()?).ok()?;
 		let meta: FileMeta = Self::read_from_uuid(uuid).await?;
 		Some((uuid, meta))
 	}

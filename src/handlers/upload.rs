@@ -1,15 +1,15 @@
 use crate::retention_control::delete_asset;
 use axum::extract::Multipart;
 use axum::response::{IntoResponse, Redirect};
-use axum::http::StatusCode;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
+use crate::error_compat::ApiResult;
 use crate::file_meta::FileMeta;
-use crate::util::error_compat::InternalServerErrorExt;
+use crate::error_compat::error_compat::InternalServerErrorExt;
 
-pub async fn accept_form(multipart: Multipart) -> Result<impl IntoResponse, StatusCode> {
+pub async fn accept_form(multipart: Multipart) -> ApiResult<impl IntoResponse> {
     let uuid = Uuid::new_v4();
     let out_dir = format!("data/{uuid}");
     fs::create_dir(&out_dir).await.unwrap();
@@ -18,12 +18,12 @@ pub async fn accept_form(multipart: Multipart) -> Result<impl IntoResponse, Stat
     if res.is_err() {
         delete_asset(uuid).await.ise()?;
     }
-    res?;
+    res.ise()?;
 
     Ok(Redirect::to(&format!("/uploads/{}", uuid)))
 }
 
-async fn do_upload(mut multipart: Multipart, out_dir: &str) -> Result<impl IntoResponse, StatusCode> {
+async fn do_upload(mut multipart: Multipart, out_dir: &str) -> ApiResult<impl IntoResponse> {
     while let Some(mut field) = multipart.next_field().await.unwrap() {
         // let name = field.name().unwrap().to_string();
         let file_name = field.file_name().unwrap().to_string();
@@ -33,7 +33,7 @@ async fn do_upload(mut multipart: Multipart, out_dir: &str) -> Result<impl IntoR
         let mut f = File::create(format!("{out_dir}/{file_name}")).await.unwrap();
         while let Some(chunk) = field.chunk().await.unwrap() {
             metadata.add_size(chunk.len() as u64);
-            f.write_all(&chunk).await.map_err(|_|StatusCode::INTERNAL_SERVER_ERROR)?;
+            f.write_all(&chunk).await.ise()?;
         }
         fs::write(format!("{out_dir}/meta.toml"), toml::to_string_pretty(&metadata).unwrap().as_bytes()).await.unwrap();
     }

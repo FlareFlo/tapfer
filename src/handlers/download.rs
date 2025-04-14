@@ -11,9 +11,11 @@ use tokio::io::BufReader;
 use tokio_util::io::ReaderStream;
 use tracing::{debug, error};
 use uuid::Uuid;
+use crate::error_compat::ApiResult;
 use crate::file_meta::FileMeta;
+use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
-use crate::util::error_compat::InternalServerErrorExt;
+use crate::error_compat::error_compat::InternalServerErrorExt;
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -22,9 +24,9 @@ struct DownloadTemplate<'a> {
 	download_url: &'a str,
 }
 
-pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse, StatusCode> {
+pub async fn download_html(Path(path): Path<String>) -> ApiResult<impl IntoResponse> {
 	if fs::try_exists(format!("data/{path}")).await.ok() != Some(true) {
-		return Err(StatusCode::NOT_FOUND);
+		return Err((StatusCode::NOT_FOUND, Html(NotFound.render().ok().ise()?)));
 	}
 	
 	let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
@@ -40,7 +42,7 @@ pub async fn download_html(Path(path): Path<String>) -> Result<impl IntoResponse
 	))
 }
 
-pub async fn download_file(Path(path): Path<String>) -> Result<impl IntoResponse, StatusCode> {
+pub async fn download_file(Path(path): Path<String>) -> ApiResult<impl IntoResponse> {
 	let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
 
 	let mut headers = HeaderMap::new();

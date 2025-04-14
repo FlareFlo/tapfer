@@ -28,7 +28,7 @@ impl Default for GlobalRetentionPolicy {
 pub async fn check_against_global_retention(uuid: Uuid, now: UtcDateTime) -> Option<()> {
 	let meta = FileMeta::read_from_uuid(uuid).await?;
 	if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
-		info!("Deleting {uuid} as it expired}");
+		info!("Deleting {uuid} as it expired");
 		delete_asset(uuid).await?;
 	}
 	Some(())

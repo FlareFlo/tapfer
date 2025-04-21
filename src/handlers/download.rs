@@ -9,6 +9,7 @@ use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse};
 use futures_util::StreamExt;
+use human_bytes::human_bytes;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::fs;
@@ -24,6 +25,8 @@ struct DownloadTemplate<'a> {
     unix_time: i64,
     expiry: &'a str,
     download_url: &'a str,
+    mimetype: &'a str,
+    filesize: &'a str,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> ApiResult<impl IntoResponse> {
@@ -34,9 +37,9 @@ pub async fn download_html(Path(path): Path<String>) -> ApiResult<impl IntoRespo
     let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
 
     let expiry = match meta.removal_policy() {
-        RemovalPolicy::SingleDownload => "Expires after a single download".to_owned(),
+        RemovalPolicy::SingleDownload => " after a single download".to_owned(),
         RemovalPolicy::Expiry { .. } => {
-            format!("Expires on {}", meta.expires_on().unwrap())
+            format!(" on {}", meta.expires_on().unwrap())
         }
     };
 
@@ -45,6 +48,8 @@ pub async fn download_html(Path(path): Path<String>) -> ApiResult<impl IntoRespo
         unix_time: meta.created().unix_timestamp(),
         expiry: &expiry,
         download_url: &format!("/uploads/{uuid}/download"),
+        mimetype: meta.content_type(),
+        filesize: &human_bytes(meta.size() as f64),
     };
 
     Ok(Html(template.render().ise()?))

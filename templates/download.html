@@ -3,14 +3,35 @@
 <head>
 	<title>{{filename}}</title>
 	{% include "style.html" %}
+	<style>
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            min-width: 300px;
+        }
+
+        .file-info p {
+            margin: 0.5rem 0;
+        }
+	</style>
 </head>
 <body>
-
-<p>{{expiry}}</p>
-<form action="{{download_url}}" method="get">
-	<button type="submit">Download</button>
-</form>
-
-
+<div class="container">
+	<div class="file-info">
+		<p><strong>Filename:</strong> {{filename}}</p>
+		<p><strong>MIME Type:</strong> {{mimetype}}</p>
+		<p><strong>Expires:</strong> {{expiry}}</p>
+		<p><strong>Size:</strong> {{filesize}}</p>
+	</div>
+	<form action="{{download_url}}" method="get">
+		<button type="submit">Download</button>
+	</form>
+</div>
 </body>
 </html>

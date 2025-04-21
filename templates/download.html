@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Download</title>
+	<title>{{filename}}</title>
 	{% include "style.html" %}
 </head>
 <body>
 
-<pre>{{toml}}</pre>
+<p>{{expiry}}</p>
 <form action="{{download_url}}" method="get">
 	<button type="submit">Download</button>
 </form>
+
 
 </body>
 </html>

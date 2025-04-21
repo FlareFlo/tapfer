@@ -1,4 +1,4 @@
-pub mod upload;
-pub mod homepage;
 pub(crate) mod download;
+pub mod homepage;
 mod not_found;
+pub mod upload;

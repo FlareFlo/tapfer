@@ -1,18 +1,14 @@
+mod error_compat;
 mod file_meta;
 mod handlers;
 mod retention_control;
-mod error_compat;
 
+use crate::handlers::upload;
+use axum::{Router, extract::DefaultBodyLimit, routing::get};
+use handlers::homepage;
 use std::fs;
-use axum::{
-    extract::{DefaultBodyLimit},
-    routing::get,
-    Router,
-};
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use handlers::homepage;
-use crate::handlers::upload;
 
 #[tokio::main]
 async fn main() {
@@ -31,7 +27,10 @@ async fn main() {
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route("/uploads/{uuid}", get(handlers::download::download_html))
-        .route("/uploads/{uuid}/download", get(handlers::download::download_file))
+        .route(
+            "/uploads/{uuid}/download",
+            get(handlers::download::download_file),
+        )
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(
             1024 * 1024 * 1024 * 5, /* 5gb */
@@ -39,14 +38,16 @@ async fn main() {
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
     // run it with hyper
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
 
 pub fn init_datadir() {
     fs::create_dir_all("data").unwrap();
-    fs::write("./data/CACHEDIR.TAG", "Signature: 8a477f597d28d172789f06886806bc55").unwrap();
+    fs::write(
+        "./data/CACHEDIR.TAG",
+        "Signature: 8a477f597d28d172789f06886806bc55",
+    )
+    .unwrap();
 }

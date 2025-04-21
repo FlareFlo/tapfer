@@ -1,3 +1,6 @@
+use crate::error_compat::ApiResult;
+use crate::error_compat::error_compat::InternalServerErrorExt;
+use crate::file_meta::FileMeta;
 use crate::retention_control::delete_asset;
 use axum::extract::Multipart;
 use axum::response::{IntoResponse, Redirect};
@@ -5,9 +8,6 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
-use crate::error_compat::ApiResult;
-use crate::file_meta::FileMeta;
-use crate::error_compat::error_compat::InternalServerErrorExt;
 
 pub async fn accept_form(multipart: Multipart) -> ApiResult<impl IntoResponse> {
     let uuid = Uuid::new_v4();
@@ -30,12 +30,19 @@ async fn do_upload(mut multipart: Multipart, out_dir: &str) -> ApiResult<impl In
         let content_type = field.content_type().unwrap().to_string();
 
         let mut metadata = FileMeta::default_policy(file_name.clone(), content_type.clone());
-        let mut f = File::create(format!("{out_dir}/{file_name}")).await.unwrap();
+        let mut f = File::create(format!("{out_dir}/{file_name}"))
+            .await
+            .unwrap();
         while let Some(chunk) = field.chunk().await.unwrap() {
             metadata.add_size(chunk.len() as u64);
             f.write_all(&chunk).await.ise()?;
         }
-        fs::write(format!("{out_dir}/meta.toml"), toml::to_string_pretty(&metadata).unwrap().as_bytes()).await.unwrap();
+        fs::write(
+            format!("{out_dir}/meta.toml"),
+            toml::to_string_pretty(&metadata).unwrap().as_bytes(),
+        )
+        .await
+        .unwrap();
     }
     Ok(())
 }

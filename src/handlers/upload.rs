@@ -37,7 +37,6 @@ async fn do_upload(mut multipart: Multipart, out_dir: &str) -> ApiResult<impl In
         }
     };
     while let Some(field) = multipart.next_field().await.ise()? {
-        dbg!(&field);
         let name = field.name().ise()?.to_string();
         match name.as_str() {
             "file" => {

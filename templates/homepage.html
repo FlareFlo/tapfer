@@ -8,15 +8,16 @@
 </head>
 <body>
 <form action="/" method="post" enctype="multipart/form-data">
+	<select name="expiration">
+		<option value="single_download" selected="selected">Delete after one download</option>
+		<option value="24_hours">Delete after 24 hours</option>
+	</select>
+
 	<label>
 		Choose file to upload:
 		<input type="file" name="file">
 	</label>
 	<input type="submit" value="Upload files">
-	<select name="expiration">
-		<option value="single_download" selected="selected">Delete after one download</option>
-		<option value="24_hours">Delete after 24 hours</option>
-	</select>
 </form>
 </body>
 </html>

@@ -32,3 +32,11 @@ pub(crate) mod error_compat {
 }
 
 pub type ApiResult<T> = Result<T, (StatusCode, Html<String>)>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum InternalServerError {
+    #[error("multipart form had fields after the file")]
+    BadMultipartOrder,
+    #[error("unknown field name {field_name}")]
+    UnknownMultipartField { field_name: String },
+}

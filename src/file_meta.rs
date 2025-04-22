@@ -19,13 +19,7 @@ pub enum RemovalPolicy {
 
 impl FileMeta {
     pub fn default_policy(name: String, mimetype: String) -> Self {
-        Self {
-            name,
-            size: 0,
-            created: UtcDateTime::now(),
-            removal_policy: RemovalPolicy::SingleDownload,
-            mimetype,
-        }
+        FileMetaBuilder::default().build(name, mimetype)
     }
 
     pub fn remove_after_download(&self) -> bool {
@@ -73,6 +67,23 @@ impl FileMeta {
         match self.removal_policy {
             RemovalPolicy::SingleDownload => None,
             RemovalPolicy::Expiry { after } => Some(self.created + after),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct FileMetaBuilder {
+    pub expiration: Option<RemovalPolicy>,
+}
+
+impl FileMetaBuilder {
+    pub fn build(self, name: String, mimetype: String) -> FileMeta {
+        FileMeta {
+            name,
+            size: 0,
+            created: UtcDateTime::now(),
+            removal_policy: self.expiration.unwrap_or(RemovalPolicy::SingleDownload),
+            mimetype,
         }
     }
 }

@@ -1,13 +1,15 @@
-use crate::error_compat::ApiResult;
 use crate::error_compat::error_compat::InternalServerErrorExt;
-use crate::file_meta::FileMeta;
+use crate::error_compat::{ApiResult, InternalServerError};
+use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use axum::extract::Multipart;
 use axum::extract::multipart::Field;
 use axum::response::{IntoResponse, Redirect};
+use time::Duration;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tracing::log::MetadataBuilder;
 use uuid::Uuid;
 
 pub async fn accept_form(multipart: Multipart) -> ApiResult<impl IntoResponse> {
@@ -25,27 +27,47 @@ pub async fn accept_form(multipart: Multipart) -> ApiResult<impl IntoResponse> {
 }
 
 async fn do_upload(mut multipart: Multipart, out_dir: &str) -> ApiResult<impl IntoResponse> {
-    while let Some(mut field) = multipart.next_field().await.unwrap() {
+    let mut meta = FileMetaBuilder::default();
+    let mut got_file = false;
+    let ensure_file_last = |got_file| {
+        if got_file {
+            Err(InternalServerError::BadMultipartOrder).ise()
+        } else {
+            Ok(())
+        }
+    };
+    while let Some(field) = multipart.next_field().await.ise()? {
         dbg!(&field);
-        let name = field.name().unwrap().to_string();
+        let name = field.name().ise()?.to_string();
         match name.as_str() {
-            "file" => {payload_field(field, out_dir).await?}
+            "file" => {
+                payload_field(field, out_dir, meta.clone()).await?;
+                got_file = true;
+            }
             "expiration" => {
-                todo!()
+                expiration_field(field, &mut meta).await?;
+                ensure_file_last(got_file)?;
             }
             _ => {
-                panic!("Unknown field {name}")
+                Err(InternalServerError::UnknownMultipartField {
+                    field_name: name.to_owned(),
+                })
+                .ise()?;
             }
         }
     }
     Ok(())
 }
 
-async fn payload_field(mut field: Field<'_>, out_dir: &str) -> ApiResult<()> {
+async fn payload_field(
+    mut field: Field<'_>,
+    out_dir: &str,
+    metadata_builder: FileMetaBuilder,
+) -> ApiResult<()> {
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
-    let mut metadata = FileMeta::default_policy(file_name.clone(), content_type.clone());
+    let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone());
     let mut f = File::create(format!("{out_dir}/{file_name}"))
         .await
         .unwrap();
@@ -59,5 +81,19 @@ async fn payload_field(mut field: Field<'_>, out_dir: &str) -> ApiResult<()> {
     )
     .await
     .unwrap();
+    Ok(())
+}
+
+async fn expiration_field(field: Field<'_>, meta: &mut FileMetaBuilder) -> ApiResult<()> {
+    let text = field.text().await.ise()?;
+    match text.as_str() {
+        "single_download" => meta.expiration = Some(RemovalPolicy::SingleDownload),
+        "24_hours" => {
+            meta.expiration = Some(RemovalPolicy::Expiry {
+                after: Duration::hours(24),
+            })
+        }
+        _ => {}
+    }
     Ok(())
 }

@@ -41,13 +41,14 @@ pub async fn delete_asset(asset: Uuid) -> TapferResult<()> {
 pub async fn check_all_assets() -> TapferResult<()> {
     let now = UtcDateTime::now();
     let mut dir = fs::read_dir("data").await?;
+    #[allow(for_loops_over_fallibles)]
     for entry in dir.next_entry().await? {
         // Skip cachedir tag etc.
         if entry.path().is_file() {
             continue
         }
         
-        if let Some(meta) = FileMeta::read_from_path(&entry.path()).await {
+        if let Ok(meta) = FileMeta::read_from_path(&entry.path()).await {
             check_against_global_retention(meta, now).await?;
         } else {
             // Delete asset straight up when metadata is missing or corrupt

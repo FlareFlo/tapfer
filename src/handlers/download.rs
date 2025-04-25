@@ -1,5 +1,3 @@
-use crate::error::ApiResult;
-use crate::error_compat::error_compat::InternalServerErrorExt;
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
@@ -15,8 +13,9 @@ use std::task::{Context, Poll};
 use tokio::fs;
 use tokio::io::BufReader;
 use tokio_util::io::ReaderStream;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use uuid::Uuid;
+use crate::error::{TapferError, TapferResult};
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -29,12 +28,12 @@ struct DownloadTemplate<'a> {
     filesize: &'a str,
 }
 
-pub async fn download_html(Path(path): Path<String>) -> ApiResult<impl IntoResponse> {
+pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     if fs::try_exists(format!("data/{path}")).await.ok() != Some(true) {
-        return Err((StatusCode::NOT_FOUND, Html(NotFound.render().ok().ise()?)));
+        return Err(TapferError::Custom { status_code: StatusCode::NOT_FOUND, body: Html(NotFound.render()?) });
     }
 
-    let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
+    let (uuid, meta) = FileMeta::read_from_path(&path).await?;
 
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
@@ -52,28 +51,28 @@ pub async fn download_html(Path(path): Path<String>) -> ApiResult<impl IntoRespo
         filesize: &human_bytes(meta.size() as f64),
     };
 
-    Ok(Html(template.render().ise()?))
+    Ok(Html(template.render()?))
 }
 
-pub async fn download_file(Path(path): Path<String>) -> ApiResult<impl IntoResponse> {
-    let (uuid, meta) = FileMeta::read_from_path(&path).await.ise()?;
+pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+    let (uuid, meta) = FileMeta::read_from_path(&path).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_str(meta.content_type()).ise()?,
+        HeaderValue::from_str(meta.content_type())?,
     );
     headers.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", meta.name())).ise()?,
+        HeaderValue::from_str(&format!("attachment; filename=\"{}\"", meta.name()))?,
     );
     headers.insert(
         header::CONTENT_LENGTH,
-        HeaderValue::from_str(&meta.size().to_string()).ise()?,
+        HeaderValue::from_str(&meta.size().to_string())?,
     );
 
     let path = format!("data/{uuid}/{}", meta.name());
-    let file = tokio::fs::File::open(&path).await.ise()?;
+    let file = tokio::fs::File::open(&path).await?;
     let stream = ReaderStream::new(BufReader::new(file));
     let wrapped = CleanupStream::new(stream, uuid, meta);
     Ok((headers, Body::from_stream(wrapped)))

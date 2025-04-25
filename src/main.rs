@@ -1,4 +1,3 @@
-mod error_compat;
 mod file_meta;
 mod handlers;
 mod retention_control;

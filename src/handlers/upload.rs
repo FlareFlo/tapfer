@@ -1,4 +1,3 @@
-use crate::error_compat::error_compat::InternalServerErrorExt;
 use crate::file_meta::{FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use axum::extract::Multipart;
@@ -9,34 +8,34 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
-use crate::error::{ApiResult, InternalServerError};
+use crate::error::{TapferError, TapferResult};
 
-pub async fn accept_form(multipart: Multipart) -> ApiResult<impl IntoResponse> {
+pub async fn accept_form(multipart: Multipart) -> TapferResult<impl IntoResponse> {
     let uuid = Uuid::new_v4();
     let out_dir = format!("data/{uuid}");
-    fs::create_dir(&out_dir).await.unwrap();
+    fs::create_dir(&out_dir).await?;
 
     let res = do_upload(multipart, &out_dir).await;
     if res.is_err() {
-        delete_asset(uuid).await.ise()?;
+        delete_asset(uuid).await?;
     }
-    res.ise()?;
+    res?;
 
     Ok(Redirect::to(&format!("/uploads/{}", uuid)))
 }
 
-async fn do_upload(mut multipart: Multipart, out_dir: &str) -> ApiResult<impl IntoResponse> {
+async fn do_upload(mut multipart: Multipart, out_dir: &str) -> TapferResult<impl IntoResponse> {
     let mut meta = FileMetaBuilder::default();
     let mut got_file = false;
     let ensure_file_last = |got_file| {
         if got_file {
-            Err(InternalServerError::BadMultipartOrder).ise()
+            Err(TapferError::BadMultipartOrder)
         } else {
             Ok(())
         }
     };
-    while let Some(field) = multipart.next_field().await.ise()? {
-        let name = field.name().ise()?.to_string();
+    while let Some(field) = multipart.next_field().await? {
+        let name = field.name().ok_or(TapferError::MultipartFieldNameMissing)?.to_string();
         match name.as_str() {
             "file" => {
                 payload_field(field, out_dir, meta.clone()).await?;
@@ -47,10 +46,9 @@ async fn do_upload(mut multipart: Multipart, out_dir: &str) -> ApiResult<impl In
                 ensure_file_last(got_file)?;
             }
             _ => {
-                Err(InternalServerError::UnknownMultipartField {
+                Err(TapferError::UnknownMultipartField {
                     field_name: name.to_owned(),
-                })
-                .ise()?;
+                })?;
             }
         }
     }
@@ -61,29 +59,27 @@ async fn payload_field(
     mut field: Field<'_>,
     out_dir: &str,
     metadata_builder: FileMetaBuilder,
-) -> ApiResult<()> {
+) -> TapferResult<()> {
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
     let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone());
     let mut f = File::create(format!("{out_dir}/{file_name}"))
-        .await
-        .unwrap();
-    while let Some(chunk) = field.chunk().await.unwrap() {
+        .await?;
+    while let Some(chunk) = field.chunk().await? {
         metadata.add_size(chunk.len() as u64);
-        f.write_all(&chunk).await.ise()?;
+        f.write_all(&chunk).await?;
     }
     fs::write(
         format!("{out_dir}/meta.toml"),
-        toml::to_string_pretty(&metadata).unwrap().as_bytes(),
+        toml::to_string_pretty(&metadata)?.as_bytes(),
     )
-    .await
-    .unwrap();
+    .await?;
     Ok(())
 }
 
-async fn expiration_field(field: Field<'_>, meta: &mut FileMetaBuilder) -> ApiResult<()> {
-    let text = field.text().await.ise()?;
+async fn expiration_field(field: Field<'_>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
+    let text = field.text().await?;
     match text.as_str() {
         "single_download" => meta.expiration = Some(RemovalPolicy::SingleDownload),
         "24_hours" => {

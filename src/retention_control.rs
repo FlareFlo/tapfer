@@ -3,15 +3,16 @@ use std::ops::Add;
 use std::sync::LazyLock;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
+use tokio::fs::remove_dir_all;
 use tracing::info;
 use uuid::Uuid;
 
-static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
+pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(|| GlobalRetentionPolicy::default());
 
 pub struct GlobalRetentionPolicy {
-    maximum_age: Duration,
-    recheck_interval: Duration,
+    pub maximum_age: Duration,
+    pub recheck_interval: Duration,
 }
 
 impl Default for GlobalRetentionPolicy {
@@ -24,10 +25,9 @@ impl Default for GlobalRetentionPolicy {
 }
 
 #[must_use]
-pub async fn check_against_global_retention(uuid: Uuid, now: UtcDateTime) -> Option<()> {
-    let meta = FileMeta::read_from_uuid(uuid).await?;
+pub async fn check_against_global_retention((uuid, meta): (Uuid, FileMeta), now: UtcDateTime) -> Option<()> {
     if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
-        info!("Deleting {uuid} as it expired");
+        info!("Deleting {uuid} as it has expired");
         delete_asset(uuid).await?;
     }
     Some(())
@@ -43,9 +43,18 @@ pub async fn check_all_assets() -> Option<()> {
     let now = UtcDateTime::now();
     let mut dir = fs::read_dir("data").await.ok()?;
     for entry in dir.next_entry().await.ok()? {
-        let (uuid, _) = FileMeta::read_from_path(&entry.path()).await?;
-        check_against_global_retention(uuid, now).await?;
+        // Skip cachedir tag etc.
+        if entry.path().is_file() {
+            continue
+        }
+        
+        if let Some(meta) = FileMeta::read_from_path(&entry.path()).await {
+            check_against_global_retention(meta, now).await?;
+        } else {
+            // Delete asset straight up when metadata is missing or corrupt
+            info!("Deleting {} as its metadata appears corrupt", entry.path().as_os_str().to_string_lossy());
+            remove_dir_all(entry.path()).await.ok()?;
+        };
     }
-
     Some(())
 }

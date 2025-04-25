@@ -1,4 +1,4 @@
-use crate::error_compat::ApiResult;
+use crate::error::ApiResult;
 use crate::error_compat::error_compat::InternalServerErrorExt;
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers::not_found::NotFound;
@@ -100,8 +100,8 @@ impl<S: Send> Drop for CleanupStream<S> {
             if meta.remove_after_download() {
                 info!("Removing {uuid} as its download has completed");
                 let res = delete_asset(uuid).await;
-                if res.is_none() {
-                    error!("Failed to delete {uuid}")
+                if res.is_ok() {
+                    error!("Failed to delete {uuid} because {res:?}")
                 }
             }
         });

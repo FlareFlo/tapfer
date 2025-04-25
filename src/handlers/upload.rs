@@ -1,6 +1,5 @@
 use crate::error_compat::error_compat::InternalServerErrorExt;
-use crate::error_compat::{ApiResult, InternalServerError};
-use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
+use crate::file_meta::{FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use axum::extract::Multipart;
 use axum::extract::multipart::Field;
@@ -9,8 +8,8 @@ use time::Duration;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tracing::log::MetadataBuilder;
 use uuid::Uuid;
+use crate::error::{ApiResult, InternalServerError};
 
 pub async fn accept_form(multipart: Multipart) -> ApiResult<impl IntoResponse> {
     let uuid = Uuid::new_v4();

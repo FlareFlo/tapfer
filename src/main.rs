@@ -2,6 +2,7 @@ mod error_compat;
 mod file_meta;
 mod handlers;
 mod retention_control;
+mod error;
 
 use crate::handlers::upload;
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
@@ -12,10 +13,11 @@ use tokio::time::sleep;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use crate::error::TapferResult;
 use crate::retention_control::{check_all_assets, GLOBAL_RETENTION_POLICY};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> TapferResult<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -42,20 +44,21 @@ async fn main() {
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
     // run it with hyper
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    tracing::debug!("listening on {}", listener.local_addr().unwrap());
-    
-    tokio::spawn(async { 
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    tracing::debug!("listening on {}", listener.local_addr()?);
+
+    tokio::spawn(async {
         loop {
             // TODO: Handle errors
             info!("Checking for stale assets");
             check_all_assets().await.unwrap();
-            
+
             sleep(Duration::from_secs_f64(GLOBAL_RETENTION_POLICY.recheck_interval.as_seconds_f64())).await;
         }
     });
-    
-    axum::serve(listener, app).await.unwrap();
+
+    axum::serve(listener, app).await?;
+    Ok(())
 }
 
 pub fn init_datadir() {

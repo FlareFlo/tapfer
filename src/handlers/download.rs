@@ -15,7 +15,7 @@ use std::task::{Context, Poll};
 use tokio::fs;
 use tokio::io::BufReader;
 use tokio_util::io::ReaderStream;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 #[derive(Template)]
@@ -98,7 +98,7 @@ impl<S: Send> Drop for CleanupStream<S> {
         let uuid = self.uuid;
         tokio::spawn(async move {
             if meta.remove_after_download() {
-                debug!("Removing {uuid} after download");
+                info!("Removing {uuid} as its download has completed");
                 let res = delete_asset(uuid).await;
                 if res.is_none() {
                     error!("Failed to delete {uuid}")

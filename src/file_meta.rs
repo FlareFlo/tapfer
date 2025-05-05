@@ -1,8 +1,9 @@
+use crate::error::TapferResult;
+use crate::upload_pool::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
 use time::{Duration, UtcDateTime};
 use uuid::Uuid;
-use crate::error::TapferResult;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FileMeta {
@@ -30,17 +31,20 @@ impl FileMeta {
         }
     }
 
-    pub async fn read_from_path(path: impl AsRef<Path>) -> TapferResult<(Uuid, Self)> {
+    pub async fn read_from_uuid_path(path: impl AsRef<Path>) -> TapferResult<(Uuid, Self)> {
         let uuid = Uuid::from_str(&path.as_ref().to_string_lossy())?;
         let meta: FileMeta = Self::read_from_uuid(uuid).await?;
         Ok((uuid, meta))
     }
 
     pub async fn read_from_uuid(uuid: Uuid) -> TapferResult<Self> {
-       Ok( toml::from_str(
-           &tokio::fs::read_to_string(format!("data/{uuid}/meta.toml"))
-               .await?,
-       )?)
+        Ok(toml::from_str(
+            &tokio::fs::read_to_string(format!("data/{uuid}/meta.toml")).await?,
+        )?)
+    }
+
+    pub fn from_upload_handle(handle: &UploadHandle) -> Self {
+        handle.file_meta().clone()
     }
 
     pub fn add_size(&mut self, extra: u64) {

@@ -1,21 +1,28 @@
+use std::io;
+use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
+use crate::handlers;
 use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
+use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse};
+use dashmap::mapref::one::Ref;
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
 use std::pin::Pin;
+use std::str::FromStr;
 use std::task::{Context, Poll};
 use tokio::fs;
+use tokio::fs::File;
 use tokio::io::BufReader;
+use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
 use uuid::Uuid;
-use crate::error::{TapferError, TapferResult};
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -29,11 +36,7 @@ struct DownloadTemplate<'a> {
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    if fs::try_exists(format!("data/{path}")).await.ok() != Some(true) {
-        return Err(TapferError::Custom { status_code: StatusCode::NOT_FOUND, body: Html(NotFound.render()?) });
-    }
-
-    let (uuid, meta) = FileMeta::read_from_path(&path).await?;
+    let ((uuid, meta), progress_handle) = get_any_meta(&path).await?;
 
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
@@ -48,14 +51,45 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         expiry: &expiry,
         download_url: &format!("/uploads/{uuid}/download"),
         mimetype: meta.content_type(),
-        filesize: &human_bytes(meta.size() as f64),
+        filesize: if let Some(_) = progress_handle {
+            "upload in progress"
+        } else {
+            &human_bytes(meta.size() as f64)
+        },
     };
 
     Ok(Html(template.render()?))
 }
 
+async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<UploadHandle>)> {
+    let data_path = format!("data/{path}");
+    let res = match fs::try_exists(&data_path).await.ok() {
+        // Regular download
+        Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),
+        // In-progress upload or doesnt exist
+        _ => {
+            let uuid = Uuid::from_str(&path)?;
+            match UPLOAD_POOL.uploads.get(&uuid) {
+                // The upload is not in progress either, so it does not exist
+                None => {
+                    return Err(TapferError::Custom {
+                        status_code: StatusCode::NOT_FOUND,
+                        body: Html(NotFound.render()?),
+                    });
+                }
+                // The upload is in-progress
+                Some(handle) => (
+                    (*handle.key(), FileMeta::from_upload_handle(handle.value())),
+                    Some(handle.clone()),
+                ),
+            }
+        }
+    };
+    Ok(res)
+}
+
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let (uuid, meta) = FileMeta::read_from_path(&path).await?;
+    let ((uuid, meta), handle) = get_any_meta(&path).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -72,48 +106,57 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
     );
 
     let path = format!("data/{uuid}/{}", meta.name());
-    let file = tokio::fs::File::open(&path).await?;
+    let file = File::open(&path).await?;
     let stream = ReaderStream::new(BufReader::new(file));
-    let wrapped = CleanupStream::new(stream, uuid, meta);
+    let wrapped = CleanupStream::new(stream, uuid, meta, handle);
     Ok((headers, Body::from_stream(wrapped)))
 }
 
 /// A stream wrapper that deletes the file when dropped
-struct CleanupStream<S: Send> {
-    inner: S,
+struct CleanupStream {
+    inner: ReaderStream<BufReader<File>>,
     meta: FileMeta,
     uuid: Uuid,
+    handle: Option<UploadHandle>,
+    self_progress: usize,
 }
 
-impl<S: Send> CleanupStream<S> {
-    fn new(inner: S, uuid: Uuid, meta: FileMeta) -> Self {
-        Self { inner, meta, uuid }
+impl CleanupStream {
+    fn new(inner: ReaderStream<BufReader<File>>, uuid: Uuid, meta: FileMeta, handle: Option<UploadHandle>) -> Self {
+        Self { inner, meta, uuid, handle, self_progress: 0 }
     }
 }
 
-impl<S: Send> Drop for CleanupStream<S> {
+impl Drop for CleanupStream {
     fn drop(&mut self) {
         let meta = self.meta.clone();
         let uuid = self.uuid;
         tokio::spawn(async move {
             if meta.remove_after_download() {
                 info!("Removing {uuid} as its download has completed");
-                let res = delete_asset(uuid).await;
-                if res.is_ok() {
-                    error!("Failed to delete {uuid} because {res:?}")
+                match delete_asset(uuid).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Failed to delete {uuid} because {e:?}")
+
+                    }
                 }
             }
         });
     }
 }
 
-impl<S, T, E> futures_core::Stream for CleanupStream<S>
-where
-    S: futures_core::Stream<Item = Result<T, E>> + Unpin + Send,
+impl futures_core::Stream for CleanupStream
 {
-    type Item = Result<T, E>;
+    type Item = Result<Bytes, io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // match Pin::new(&mut self.inner).poll_next(cx) {
+        //     Poll::Ready(Some(Ok(chunk))) => {
+        //         todo!()
+        //     }
+        //     other => other,
+        // }
         self.inner.poll_next_unpin(cx)
     }
 }

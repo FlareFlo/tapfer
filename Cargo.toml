@@ -21,3 +21,4 @@ tokio-util = { version = "0.7.14", features = ["io"] }
 futures-util = "0.3.31"
 human_bytes = "0.4.3"
 thiserror = "2.0.12"
+dashmap = "6.1.0"

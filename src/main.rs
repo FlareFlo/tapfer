@@ -1,9 +1,12 @@
+mod error;
 mod file_meta;
 mod handlers;
 mod retention_control;
-mod error;
+mod upload_pool;
 
+use crate::error::TapferResult;
 use crate::handlers::upload;
+use crate::retention_control::{GLOBAL_RETENTION_POLICY, check_all_assets};
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use handlers::homepage;
 use std::fs;
@@ -12,8 +15,6 @@ use tokio::time::sleep;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use crate::error::TapferResult;
-use crate::retention_control::{check_all_assets, GLOBAL_RETENTION_POLICY};
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
@@ -52,7 +53,10 @@ async fn main() -> TapferResult<()> {
             info!("Checking for stale assets");
             check_all_assets().await.unwrap();
 
-            sleep(Duration::from_secs_f64(GLOBAL_RETENTION_POLICY.recheck_interval.as_seconds_f64())).await;
+            sleep(Duration::from_secs_f64(
+                GLOBAL_RETENTION_POLICY.recheck_interval.as_seconds_f64(),
+            ))
+            .await;
         }
     });
 

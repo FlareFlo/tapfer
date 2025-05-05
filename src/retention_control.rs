@@ -1,3 +1,4 @@
+use crate::error::TapferResult;
 use crate::file_meta::FileMeta;
 use std::ops::Add;
 use std::sync::LazyLock;
@@ -6,7 +7,6 @@ use tokio::fs;
 use tokio::fs::remove_dir_all;
 use tracing::info;
 use uuid::Uuid;
-use crate::error::TapferResult;
 
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(|| GlobalRetentionPolicy::default());
@@ -25,7 +25,10 @@ impl Default for GlobalRetentionPolicy {
     }
 }
 
-pub async fn check_against_global_retention((uuid, meta): (Uuid, FileMeta), now: UtcDateTime) -> TapferResult<()> {
+pub async fn check_against_global_retention(
+    (uuid, meta): (Uuid, FileMeta),
+    now: UtcDateTime,
+) -> TapferResult<()> {
     if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
         info!("Deleting {uuid} as it has expired");
         delete_asset(uuid).await?;
@@ -45,14 +48,17 @@ pub async fn check_all_assets() -> TapferResult<()> {
     for entry in dir.next_entry().await? {
         // Skip cachedir tag etc.
         if entry.path().is_file() {
-            continue
+            continue;
         }
-        
-        if let Ok(meta) = FileMeta::read_from_path(&entry.path()).await {
+
+        if let Ok(meta) = FileMeta::read_from_uuid_path(&entry.path()).await {
             check_against_global_retention(meta, now).await?;
         } else {
             // Delete asset straight up when metadata is missing or corrupt
-            info!("Deleting {} as its metadata appears corrupt", entry.path().as_os_str().to_string_lossy());
+            info!(
+                "Deleting {} as its metadata appears corrupt",
+                entry.path().as_os_str().to_string_lossy()
+            );
             remove_dir_all(entry.path()).await?;
         };
     }

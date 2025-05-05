@@ -68,6 +68,7 @@ async fn payload_field(
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
+    // TODO: For updown streams we need to know the target file size
     let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone());
     let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
     let mut f = File::create(format!("data/{uuid}/{file_name}")).await?;
@@ -76,7 +77,7 @@ async fn payload_field(
         metadata.add_size(chunk.len() as u64);
         f.write_all(&chunk).await?;
         handle.add_progress(chunk.len()).await;
-        // sleep(StdDuration::from_millis(100)).await; // Debug slowdown for live upload and download
+        sleep(StdDuration::from_millis(100)).await; // Debug slowdown for live upload and download
     }
     fs::write(
         format!("data/{uuid}/meta.toml"),

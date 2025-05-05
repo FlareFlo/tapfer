@@ -62,8 +62,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
 }
 
 async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<UploadHandle>)> {
-    let data_path = format!("data/{path}");
-    let res = match fs::try_exists(&data_path).await.ok() {
+    let res = match fs::try_exists(&format!("data/{path}/meta.toml")).await.ok() {
         // Regular download
         Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),
         // In-progress upload or doesnt exist
@@ -89,7 +88,11 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
 }
 
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, meta), handle) = get_any_meta(&path).await?;
+    let ((uuid, mut meta), handle) = get_any_meta(&path).await?;
+    // TODO: Remove its for debugging only
+    if handle.is_some() {
+        meta.add_size(4000000000) // 4GB for testing
+    }
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -151,6 +154,7 @@ impl futures_core::Stream for CleanupStream
     type Item = Result<Bytes, io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // TODO: Limit download speed
         // match Pin::new(&mut self.inner).poll_next(cx) {
         //     Poll::Ready(Some(Ok(chunk))) => {
         //         todo!()

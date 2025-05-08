@@ -3,6 +3,7 @@ mod file_meta;
 mod handlers;
 mod retention_control;
 mod upload_pool;
+mod configuration;
 
 use crate::error::{TapferError, TapferResult};
 use crate::handlers::upload;
@@ -18,6 +19,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use crate::configuration::MAX_UPLOAD_SIZE;
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
@@ -25,8 +27,8 @@ async fn main() -> TapferResult<()> {
         error!("Caught CTRL-C... Exiting right away");
         std::process::exit(1);
     })
-        .expect("Error setting Ctrl-C handler");    
-    
+        .expect("Error setting Ctrl-C handler");
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -51,7 +53,7 @@ async fn main() -> TapferResult<()> {
         )
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(
-            1024 * 1024 * 1024 * 100,
+            MAX_UPLOAD_SIZE,
         ))
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/graphics", graphics_dir_service);

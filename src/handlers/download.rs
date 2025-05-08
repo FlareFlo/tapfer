@@ -25,6 +25,7 @@ use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
 use uuid::Uuid;
+use crate::configuration::DOWNLOAD_CHUNKSIZE;
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -36,8 +37,6 @@ struct DownloadTemplate<'a> {
     mimetype: &'a str,
     filesize: &'a str,
 }
-
-const DOWNLOAD_CHUNKSIZE: usize = 1024 * 1024;
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, meta), progress_handle) = get_any_meta(&path).await?;

@@ -1,12 +1,14 @@
-use std::time::Duration as StdDuration;
-use time::Duration as TimeDuration;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use crate::upload_pool::UPLOAD_POOL;
 use axum::extract::Multipart;
 use axum::extract::multipart::Field;
-use axum::response::{IntoResponse, Redirect};
+use axum::http::header::CONTENT_LENGTH;
+use axum::http::{HeaderName, HeaderValue, StatusCode};
+use axum::response::{Html, IntoResponse, Redirect};
+use std::time::Duration as StdDuration;
+use time::Duration as TimeDuration;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -36,6 +38,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             Ok(())
         }
     };
+    let mut size: Option<u64> = None;
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
@@ -43,12 +46,15 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             .to_string();
         match name.as_str() {
             "file" => {
-                payload_field(field, uuid, meta.clone()).await?;
+                payload_field(field, uuid, meta.clone(), size).await?;
                 got_file = true;
             }
             "expiration" => {
                 expiration_field(field, &mut meta).await?;
                 ensure_file_last(got_file)?;
+            }
+            "file_size" => {
+                size = Some(field.text().await?.parse()?);
             }
             _ => {
                 Err(TapferError::UnknownMultipartField {
@@ -64,20 +70,24 @@ async fn payload_field(
     mut field: Field<'_>,
     uuid: Uuid,
     metadata_builder: FileMetaBuilder,
+    size: Option<u64>,
 ) -> TapferResult<()> {
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
-    // TODO: For updown streams we need to know the target file size
-    let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone());
-    let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
+    let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
+    let handle = size.and_then(|_| Some(UPLOAD_POOL.handle(uuid, metadata.clone())));
     let mut f = File::create(format!("data/{uuid}/{file_name}")).await?;
     println!("localhost:3000/uploads/{uuid}");
     while let Some(chunk) = field.chunk().await? {
-        metadata.add_size(chunk.len() as u64);
         f.write_all(&chunk).await?;
-        handle.add_progress(chunk.len()).await;
-        sleep(StdDuration::from_millis(100)).await; // Debug slowdown for live upload and download
+
+        if let Some(handle) = &handle {
+            handle.add_progress(chunk.len()).await;
+        } else {
+            metadata.add_size(chunk.len() as _)?;
+        }
+        sleep(StdDuration::from_millis(30)).await; // Debug slowdown for live upload and download
     }
     fs::write(
         format!("data/{uuid}/meta.toml"),
@@ -85,7 +95,9 @@ async fn payload_field(
     )
     .await?;
     // The upload is complete, mark the upload as complete
-    handle.mark_complete().await;
+    if let Some(h) = handle {
+        h.mark_complete().await;
+    };
     Ok(())
 }
 

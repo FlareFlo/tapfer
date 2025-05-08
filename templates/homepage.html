@@ -30,6 +30,7 @@
 		<option value="single_download" selected="selected">Delete after one download</option>
 		<option value="24_hours">Delete after 24 hours</option>
 	</select>
+	<input type="hidden" name="file_size", value="0">
 
 	<label>
 		Choose file to upload:
@@ -45,6 +46,9 @@
         const form = e.target;
         const formData = new FormData(form);
         const xhr = new XMLHttpRequest();
+        const fileInput = form.querySelector('input[name="file"]');
+        const file = fileInput.files[0];
+        formData.set("file_size", file.size);
 
         form.style.backgroundSize = '0% 100%';
 
@@ -58,7 +62,7 @@
         xhr.onload = function () {
             // Follow redirect to upload location
             if (xhr.status >= 200 && xhr.status < 300) {
-                window.location.href = xhr.responseURL;
+                //window.location.href = xhr.responseURL;
             } else {
                 alert('Upload failed.');
                 form.style.backgroundSize = '0% 100%';

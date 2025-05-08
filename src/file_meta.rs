@@ -1,4 +1,4 @@
-use crate::error::TapferResult;
+use crate::error::{TapferError, TapferResult};
 use crate::upload_pool::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
@@ -8,7 +8,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FileMeta {
     name: String,
-    size: u64,
+    size: FileSize,
     created: UtcDateTime,
     removal_policy: RemovalPolicy,
     mimetype: String,
@@ -19,9 +19,35 @@ pub enum RemovalPolicy {
     Expiry { after: Duration },
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum FileSize {
+    AlreadyKnown(u64),
+    Dynamic(u64),
+}
+
+impl FileSize {
+    pub fn current_size(&self) -> u64 {
+        match self {
+            FileSize::AlreadyKnown(s) => *s,
+            FileSize::Dynamic(s) => *s,
+        }
+    }
+
+    pub fn add_size(&mut self, extra: u64) -> TapferResult<()> {
+        match self {
+            FileSize::AlreadyKnown(_) => {
+                Err(TapferError::AddSizeToAlreadyKnown)
+            }
+            FileSize::Dynamic(s) => {
+                *s += extra;
+                Ok(())
+            }
+        }
+    }
+}
 impl FileMeta {
-    pub fn default_policy(name: String, mimetype: String) -> Self {
-        FileMetaBuilder::default().build(name, mimetype)
+    pub fn default_policy(name: String, mimetype: String, known_size: Option<u64>) -> Self {
+        FileMetaBuilder::default().build(name, mimetype, known_size)
     }
 
     pub fn remove_after_download(&self) -> bool {
@@ -47,8 +73,8 @@ impl FileMeta {
         handle.file_meta().clone()
     }
 
-    pub fn add_size(&mut self, extra: u64) {
-        self.size += extra;
+    pub fn add_size(&mut self, extra: u64) -> TapferResult<()> {
+        self.size.add_size(extra)
     }
     pub fn name(&self) -> &str {
         self.name.as_str()
@@ -57,13 +83,19 @@ impl FileMeta {
         self.mimetype.as_str()
     }
     pub fn size(&self) -> u64 {
-        self.size
+        self.size.current_size()
     }
     pub fn removal_policy(&self) -> RemovalPolicy {
         self.removal_policy
     }
     pub fn created(&self) -> UtcDateTime {
         self.created
+    }
+    pub fn known_size(&self) -> Option<u64> {
+        match self.size {
+            FileSize::AlreadyKnown(s) => Some(s),
+            FileSize::Dynamic(_) => None,
+        }
     }
 
     pub fn expires_on(&self) -> Option<UtcDateTime> {
@@ -80,10 +112,14 @@ pub struct FileMetaBuilder {
 }
 
 impl FileMetaBuilder {
-    pub fn build(self, name: String, mimetype: String) -> FileMeta {
+    pub fn build(self, name: String, mimetype: String, known_size: Option<u64>) -> FileMeta {
         FileMeta {
             name,
-            size: 0,
+            size: if let Some(s) = known_size {
+                FileSize::AlreadyKnown(s)
+            } else {
+                FileSize::Dynamic(0)
+            },
             created: UtcDateTime::now(),
             removal_policy: self.expiration.unwrap_or(RemovalPolicy::SingleDownload),
             mimetype,

@@ -1,4 +1,3 @@
-use std::io;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers;
@@ -13,12 +12,15 @@ use axum::response::{Html, IntoResponse};
 use dashmap::mapref::one::Ref;
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
+use std::io;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::BufReader;
+use tokio::time::sleep;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
@@ -53,10 +55,14 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         expiry: &expiry,
         download_url: &format!("/uploads/{uuid}/download"),
         mimetype: meta.content_type(),
-        filesize: if let Some(_) = progress_handle {
-            "upload in progress"
-        } else {
+        filesize: if let Some(_) = meta.known_size() {
             &human_bytes(meta.size() as f64)
+        } else {
+            if progress_handle.is_some() {
+                "upload in progress"
+            } else {
+                &human_bytes(meta.size() as f64)
+            }
         },
     };
 
@@ -92,9 +98,6 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, mut meta), handle) = get_any_meta(&path).await?;
     // TODO: Remove its for debugging only
-    if handle.is_some() {
-        meta.add_size(4000000000) // 4GB for testing
-    }
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -112,7 +115,7 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
 
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
-    let stream = ReaderStream::new(BufReader::with_capacity(DOWNLOAD_CHUNKSIZE,file));
+    let stream = ReaderStream::new(BufReader::with_capacity(DOWNLOAD_CHUNKSIZE, file));
     let wrapped = DownloadStream::new(stream, uuid, meta, handle);
     Ok((headers, Body::from_stream(wrapped)))
 }
@@ -127,8 +130,19 @@ struct DownloadStream {
 }
 
 impl DownloadStream {
-    fn new(inner: ReaderStream<BufReader<File>>, uuid: Uuid, meta: FileMeta, handle: Option<UploadHandle>) -> Self {
-        Self { inner, meta, uuid, handle, self_progress: 0 }
+    fn new(
+        inner: ReaderStream<BufReader<File>>,
+        uuid: Uuid,
+        meta: FileMeta,
+        handle: Option<UploadHandle>,
+    ) -> Self {
+        Self {
+            inner,
+            meta,
+            uuid,
+            handle,
+            self_progress: 0,
+        }
     }
 }
 
@@ -147,7 +161,6 @@ impl Drop for DownloadStream {
                     Ok(_) => {}
                     Err(e) => {
                         error!("Failed to delete {uuid} because {e:?}")
-
                     }
                 }
             }
@@ -155,14 +168,17 @@ impl Drop for DownloadStream {
     }
 }
 
-impl futures_core::Stream for DownloadStream
-{
+impl futures_core::Stream for DownloadStream {
     type Item = Result<Bytes, io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Some(handle) = &self.handle {
-            if (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress  {
-                cx.waker().wake_by_ref();
+            if (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress {
+                let waker = cx.waker().clone();
+                tokio::spawn(async {
+                    sleep(Duration::from_millis(100)).await;
+                    waker.wake();
+                });
                 return Poll::Pending;
             }
         }

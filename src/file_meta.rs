@@ -19,9 +19,12 @@ pub enum RemovalPolicy {
     Expiry { after: Duration },
 }
 
+/// A wrapper for the size of an upload asset
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum FileSize {
+    /// When the client has transmitted the size of the asset
     AlreadyKnown(u64),
+    /// When we are manually keeping track of the asset size
     Dynamic(u64),
 }
 
@@ -33,6 +36,7 @@ impl FileSize {
         }
     }
 
+    /// Adds extra to the files tracked size. Returns error when size was already known
     pub fn add_size(&mut self, extra: u64) -> TapferResult<()> {
         match self {
             FileSize::AlreadyKnown(_) => {

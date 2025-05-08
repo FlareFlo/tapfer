@@ -13,11 +13,17 @@ use std::fs;
 use std::time::Duration;
 use tokio::time::sleep;
 use tower_http::limit::RequestBodyLimitLayer;
-use tracing::info;
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
+    ctrlc::set_handler(move || {
+        error!("Caught CTRL-C... Exiting right away");
+        std::process::exit(1);
+    })
+        .expect("Error setting Ctrl-C handler");    
+    
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {

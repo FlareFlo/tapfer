@@ -4,15 +4,18 @@ mod handlers;
 mod retention_control;
 mod upload_pool;
 
-use crate::error::TapferResult;
+use crate::error::{TapferError, TapferResult};
 use crate::handlers::upload;
 use crate::retention_control::{GLOBAL_RETENTION_POLICY, check_all_assets};
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use handlers::homepage;
 use std::fs;
 use std::time::Duration;
+use axum::response::IntoResponse;
+use axum::routing::get_service;
 use tokio::time::sleep;
 use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -35,6 +38,8 @@ async fn main() -> TapferResult<()> {
 
     init_datadir();
 
+    let graphics_dir_service = get_service(ServeDir::new("graphics"));
+
     // build our application with some routes
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
@@ -48,7 +53,8 @@ async fn main() -> TapferResult<()> {
         .layer(RequestBodyLimitLayer::new(
             1024 * 1024 * 1024 * 100, /* 5gb */
         ))
-        .layer(tower_http::trace::TraceLayer::new_for_http());
+        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .nest_service("/graphics", graphics_dir_service);
 
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;

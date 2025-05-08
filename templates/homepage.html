@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Upload to Tapfer</title>
 	{% include "style.html" %}
+	{% include "favicon.html" %}
 	<style>
         #uploadBox {
             position: relative;
@@ -92,20 +93,7 @@
             }
         });
 
-        xhr.onload = function () {
-            // Follow redirect to upload location
-            if (xhr.status >= 200 && xhr.status < 300) {
-                window.location.href = xhr.responseURL;
-            } else {
-                alert('Upload failed.');
-                background.style.backgroundSize = '0% 100%';
-            }
-        };
-
-        xhr.open('POST', '/', true);
-        xhr.send(formData);
-
-        setTimeout(() => {
+        xhr.upload.addEventListener('progress', function (e) {
             const xhr = new XMLHttpRequest();
             xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
 
@@ -120,7 +108,20 @@
 
 
             xhr.send();
-		}, 1000);
+        }, { once: true });
+
+        xhr.onload = function () {
+            // Follow redirect to upload location
+            if (xhr.status >= 200 && xhr.status < 300) {
+                window.location.href = xhr.responseURL;
+            } else {
+                alert('Upload failed.');
+                background.style.backgroundSize = '0% 100%';
+            }
+        };
+
+        xhr.open('POST', '/', true);
+        xhr.send(formData);
     });
 </script>
 </body>

@@ -51,7 +51,7 @@ async fn main() -> TapferResult<()> {
         )
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(
-            1024 * 1024 * 1024 * 100, /* 5gb */
+            1024 * 1024 * 1024 * 100,
         ))
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/graphics", graphics_dir_service);

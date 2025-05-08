@@ -77,16 +77,15 @@ async fn payload_field(
 
     let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client
-    let handle = size.and_then(|_| Some(UPLOAD_POOL.handle(uuid, metadata.clone())));
+    let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
     let mut f = File::create(format!("data/{uuid}/{file_name}")).await?;
     println!("localhost:3000/uploads/{uuid}");
     while let Some(chunk) = field.chunk().await? {
         f.write_all(&chunk).await?;
 
         // Increment the updown handle when applicable, otherwise, keep track of the dynamic filesize
-        if let Some(handle) = &handle {
-            handle.add_progress(chunk.len()).await;
-        } else {
+        handle.add_progress(chunk.len()).await;
+        if size.is_none() {
             metadata.add_size(chunk.len() as _)?;
         }
         sleep(StdDuration::from_millis(30)).await; // Debug slowdown for live upload and download
@@ -97,9 +96,7 @@ async fn payload_field(
     )
     .await?;
     // The upload is complete, mark the upload as complete
-    if let Some(h) = handle {
-        h.mark_complete().await;
-    };
+    handle.mark_complete().await;
     Ok(())
 }
 

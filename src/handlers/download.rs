@@ -108,10 +108,20 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
         header::CONTENT_DISPOSITION,
         HeaderValue::from_str(&format!("attachment; filename=\"{}\"", meta.name()))?,
     );
-    headers.insert(
-        header::CONTENT_LENGTH,
-        HeaderValue::from_str(&meta.size().to_string())?,
-    );
+    // Add size when it is known
+    if let Some(known) = meta.known_size() {
+        headers.insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&known.to_string())?,
+        );
+    }
+    // or when there is no ongoing upload
+    else if handle.is_none() {
+        headers.insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&meta.size().to_string())?,
+        );
+    }
 
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
@@ -174,7 +184,9 @@ impl futures_core::Stream for DownloadStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Some(handle) = &self.handle {
             // Delay polling the file when it is incomplete and the current progress is very close to the upload progress
-            if !handle.is_complete_blocking() && (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress {
+            if !handle.is_complete_blocking()
+                && (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress
+            {
                 let waker = cx.waker().clone();
                 tokio::spawn(async {
                     sleep(Duration::from_millis(100)).await;

@@ -39,9 +39,7 @@ impl FileSize {
     /// Adds extra to the files tracked size. Returns error when size was already known
     pub fn add_size(&mut self, extra: u64) -> TapferResult<()> {
         match self {
-            FileSize::AlreadyKnown(_) => {
-                Err(TapferError::AddSizeToAlreadyKnown)
-            }
+            FileSize::AlreadyKnown(_) => Err(TapferError::AddSizeToAlreadyKnown),
             FileSize::Dynamic(s) => {
                 *s += extra;
                 Ok(())

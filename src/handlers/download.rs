@@ -126,14 +126,14 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
 
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
-    let stream = ReaderStream::new(BufReader::with_capacity(DOWNLOAD_CHUNKSIZE, file));
+    let stream = ReaderStream::with_capacity(file, DOWNLOAD_CHUNKSIZE);
     let wrapped = DownloadStream::new(stream, uuid, meta, handle);
     Ok((headers, Body::from_stream(wrapped)))
 }
 
 /// A stream wrapper that deletes the file when dropped and rate-limits download during updown
 struct DownloadStream {
-    inner: ReaderStream<BufReader<File>>,
+    inner: ReaderStream<File>,
     meta: FileMeta,
     uuid: Uuid,
     handle: Option<UploadHandle>,
@@ -142,7 +142,7 @@ struct DownloadStream {
 
 impl DownloadStream {
     fn new(
-        inner: ReaderStream<BufReader<File>>,
+        inner: ReaderStream<File>,
         uuid: Uuid,
         meta: FileMeta,
         handle: Option<UploadHandle>,

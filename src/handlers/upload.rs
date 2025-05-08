@@ -17,7 +17,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::sleep;
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(|| DashMap::new());
@@ -54,6 +54,9 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             .to_string();
         match name.as_str() {
             "file" => {
+                if size.is_some() == in_progress_token.is_some() {  
+                    warn!("Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?");
+                }
                 payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;
                 got_file = true;
             }
@@ -66,6 +69,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             }
             "in_progress_token" => {
                 in_progress_token = Some(field.text().await?.parse()?);
+                info!("Adding progress token {in_progress_token:?}");
                 PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
             }
             _ => {

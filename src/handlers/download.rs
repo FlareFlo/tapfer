@@ -35,6 +35,8 @@ struct DownloadTemplate<'a> {
     filesize: &'a str,
 }
 
+const DOWNLOAD_CHUNKSIZE: usize = 1024 * 1024;
+
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, meta), progress_handle) = get_any_meta(&path).await?;
 
@@ -110,13 +112,13 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
 
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
-    let stream = ReaderStream::new(BufReader::new(file));
-    let wrapped = CleanupStream::new(stream, uuid, meta, handle);
+    let stream = ReaderStream::new(BufReader::with_capacity(DOWNLOAD_CHUNKSIZE,file));
+    let wrapped = DownloadStream::new(stream, uuid, meta, handle);
     Ok((headers, Body::from_stream(wrapped)))
 }
 
-/// A stream wrapper that deletes the file when dropped
-struct CleanupStream {
+/// A stream wrapper that deletes the file when dropped and rate-limits download during updown
+struct DownloadStream {
     inner: ReaderStream<BufReader<File>>,
     meta: FileMeta,
     uuid: Uuid,
@@ -124,17 +126,21 @@ struct CleanupStream {
     self_progress: usize,
 }
 
-impl CleanupStream {
+impl DownloadStream {
     fn new(inner: ReaderStream<BufReader<File>>, uuid: Uuid, meta: FileMeta, handle: Option<UploadHandle>) -> Self {
         Self { inner, meta, uuid, handle, self_progress: 0 }
     }
 }
 
-impl Drop for CleanupStream {
+impl Drop for DownloadStream {
     fn drop(&mut self) {
         let meta = self.meta.clone();
         let uuid = self.uuid;
         tokio::spawn(async move {
+            // Do not delete files in upload when an in-progress download fails early
+            if UPLOAD_POOL.uploads.contains_key(&uuid) {
+                return;
+            }
             if meta.remove_after_download() {
                 info!("Removing {uuid} as its download has completed");
                 match delete_asset(uuid).await {
@@ -149,18 +155,24 @@ impl Drop for CleanupStream {
     }
 }
 
-impl futures_core::Stream for CleanupStream
+impl futures_core::Stream for DownloadStream
 {
     type Item = Result<Bytes, io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // TODO: Limit download speed
-        // match Pin::new(&mut self.inner).poll_next(cx) {
-        //     Poll::Ready(Some(Ok(chunk))) => {
-        //         todo!()
-        //     }
-        //     other => other,
-        // }
-        self.inner.poll_next_unpin(cx)
+        if let Some(handle) = &self.handle {
+            if (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress  {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
+        }
+        let poll_res = self.inner.poll_next_unpin(cx);
+        match &poll_res {
+            Poll::Ready(Some(Ok(b))) => {
+                self.self_progress += b.len();
+            }
+            _ => {}
+        }
+        poll_res
     }
 }

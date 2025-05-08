@@ -56,6 +56,14 @@ impl UploadHandle {
     pub async fn add_progress(&self, progress: usize) {
         self.handle.write().await.progress += progress;
     }
+    
+    pub async fn get_progress(&self) -> usize {
+        self.handle.read().await.progress
+    }
+
+    pub fn get_progress_blocking(&self) -> usize {
+        block_in_place(|| self.handle.blocking_read().progress)
+    }
 
     /// Marks upload complete
     pub async fn mark_complete(&self) {

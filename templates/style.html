@@ -11,11 +11,16 @@
     }
 
     form {
-        background: white;
         padding: 2rem 3rem;
         border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
         text-align: center;
+
+        display: flex;
+
+        justify-content: center;
+        align-items: center;
+        /* flex-flow: column; */
+        flex-direction: column;
     }
 
     label {
@@ -29,7 +34,7 @@
         margin-top: 0.5rem;
     }
 
-    input[type="submit"] {
+    input[type="submit"], button {
         margin-top: 1.5rem;
         padding: 0.6rem 1.5rem;
         background-color: #4F46E5;
@@ -39,24 +44,26 @@
         font-size: 1rem;
         cursor: pointer;
         transition: background 0.3s ease;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
     }
 
-    input[type="submit"]:hover {
+    input[type="submit"]:hover, button:hover {
         background-color: #4338CA;
     }
 
-    button {
-        padding: 0.5rem 1rem;
-        font-size: 1rem;
-        border: none;
-        border-radius: 0.5rem;
-        background-color: #4a90e2;
-        color: white;
-        cursor: pointer;
-        transition: background-color 0.3s;
+    .flex-container {
+
+        display: flex;
+
+        justify-content: center;
+        align-items: center;
+        /* flex-flow: column; */
+        flex-direction: column;
+
+        height: 35vh;
+        padding: 15px;
+        gap: 5px;
+
     }
 
-    button:hover {
-        background-color: #357abd;
-    }
 </style>

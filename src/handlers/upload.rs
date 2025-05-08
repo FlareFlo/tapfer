@@ -83,7 +83,7 @@ async fn payload_field(
     size: Option<u64>,
     in_progress_token: Option<u32>,
 ) -> TapferResult<()> {
-    let _ = scopeguard::guard(in_progress_token, |v|{
+    let guard = scopeguard::guard(in_progress_token, |v|{
         if let Some(t) = v {
             PROGRESS_TOKEN_LUT.remove(&t);
         }
@@ -96,7 +96,6 @@ async fn payload_field(
     // Only permit updown stream when the files final size was transmitted by the client
     let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
     let mut f = File::create(format!("data/{uuid}/{file_name}")).await?;
-    println!("localhost:3000/uploads/{uuid}");
     while let Some(chunk) = field.chunk().await? {
         f.write_all(&chunk).await?;
 
@@ -105,7 +104,7 @@ async fn payload_field(
         if size.is_none() {
             metadata.add_size(chunk.len() as _)?;
         }
-        sleep(StdDuration::from_millis(30)).await; // Debug slowdown for live upload and download
+        // sleep(StdDuration::from_micros(2000)).await; // Debug slowdown for live upload and download
     }
     fs::write(
         format!("data/{uuid}/meta.toml"),
@@ -114,6 +113,7 @@ async fn payload_field(
     .await?;
     // The upload is complete, mark the upload as complete
     handle.mark_complete().await;
+    drop(guard);
     Ok(())
 }
 

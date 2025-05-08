@@ -6,7 +6,7 @@
 	<title>Upload to Tapfer</title>
 	{% include "style.html" %}
 	<style>
-        form#uploadForm {
+        #uploadBox {
             position: relative;
             z-index: 1;
             padding: 2em;
@@ -21,24 +21,47 @@
             background-size: 0% 100%;
             background-color: #ffffff; /* fallback background */
             transition: background-size 0.2s ease;
+
+            #blurred-percentage {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10vw; /* Adjust this to fine-tune fit */
+                color: rgba(0, 0, 0, 0.15);
+                user-select: none;
+                pointer-events: none;
+                z-index: 0;
+                white-space: nowrap;
+            }
         }
 	</style>
 </head>
 <body>
-<form id="uploadForm">
-	<select name="expiration">
-		<option value="single_download" selected="selected">Delete after one download</option>
-		<option value="24_hours">Delete after 24 hours</option>
-	</select>
-	<input type="hidden" name="file_size", value="0">
-	<input type="hidden" name="in_progress_token", value="">
+<div class="flex-container" id="uploadBox">
+	<div id="blurred-percentage"></div>
+	<form id="uploadForm">
+		<select name="expiration">
+			<option value="single_download" selected="selected">Delete after one download</option>
+			<option value="24_hours">Delete after 24 hours</option>
+		</select>
+		<input type="hidden" name="file_size", value="0">
+		<input type="hidden" name="in_progress_token", value="">
 
-	<label>
-		Choose file to upload:
-		<input type="file" name="file" required>
-	</label>
-	<input type="submit" value="Upload files">
-</form>
+		<label>
+			Choose file to upload:
+			<input type="file" name="file" required>
+		</label>
+		<input type="submit" value="Upload files">
+	</form>
+
+	<div>
+		<a id="downloadURL" href="" target="_blank">Download URL</a>
+		<button>Copy to clipboard</button>
+	</div>
+</div>
 
 <script>
     document.getElementById('uploadForm').addEventListener('submit', function (e) {
@@ -54,30 +77,50 @@
         const fileInput = form.querySelector('input[name="file"]');
         const file = fileInput.files[0];
         formData.set("file_size", file.size);
-        // TODO: Request the UUID for this token once the POST is dispatched
         formData.set("in_progress_token", random_seed.toString());
 
-        form.style.backgroundSize = '0% 100%';
+        const background = document.getElementById('uploadBox');
+        const percentageElement = document.getElementById('blurred-percentage');
+
+        background.style.backgroundSize = '0% 100%';
 
         xhr.upload.addEventListener('progress', function (e) {
             if (e.lengthComputable) {
                 const percent = (e.loaded / e.total) * 100;
-                form.style.backgroundSize = percent + '% 100%';
+                background.style.backgroundSize = percent + '% 100%';
+                percentageElement.innerText = `${percent.toFixed(1)}%`;
             }
         });
 
         xhr.onload = function () {
             // Follow redirect to upload location
             if (xhr.status >= 200 && xhr.status < 300) {
-                //window.location.href = xhr.responseURL;
+                window.location.href = xhr.responseURL;
             } else {
                 alert('Upload failed.');
-                form.style.backgroundSize = '0% 100%';
+                background.style.backgroundSize = '0% 100%';
             }
         };
 
         xhr.open('POST', '/', true);
         xhr.send(formData);
+
+        setTimeout(() => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
+
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const urlelem = document.getElementById('downloadURL');
+                    const url = `/uploads/${xhr.responseText}`;
+                    urlelem.href = url;
+                    urlelem.innerText = xhr.responseText;
+                }
+            };
+
+
+            xhr.send();
+		}, 1000);
     });
 </script>
 </body>

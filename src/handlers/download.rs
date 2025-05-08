@@ -173,7 +173,7 @@ impl futures_core::Stream for DownloadStream {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Some(handle) = &self.handle {
-            if (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress {
+            if !handle.is_complete_blocking() && (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress {
                 let waker = cx.waker().clone();
                 tokio::spawn(async {
                     sleep(Duration::from_millis(100)).await;

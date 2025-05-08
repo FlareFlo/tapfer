@@ -11,11 +11,13 @@ use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
 use std::time::Duration as StdDuration;
 use dashmap::DashMap;
+use scopeguard::defer;
 use time::Duration as TimeDuration;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::sleep;
+use tracing::info;
 use uuid::Uuid;
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(|| DashMap::new());
@@ -73,6 +75,12 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             }
         }
     }
+    defer!{
+        if let Some(t) = in_progress_token {
+            info!("deleting progress token {t}");
+            PROGRESS_TOKEN_LUT.remove(&t);
+        }
+    }
     Ok(())
 }
 
@@ -83,12 +91,6 @@ async fn payload_field(
     size: Option<u64>,
     in_progress_token: Option<u32>,
 ) -> TapferResult<()> {
-    let guard = scopeguard::guard(in_progress_token, |v|{
-        if let Some(t) = v {
-            PROGRESS_TOKEN_LUT.remove(&t);
-        }
-    });
-
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
@@ -113,7 +115,6 @@ async fn payload_field(
     .await?;
     // The upload is complete, mark the upload as complete
     handle.mark_complete().await;
-    drop(guard);
     Ok(())
 }
 

@@ -98,7 +98,6 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
 
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, mut meta), handle) = get_any_meta(&path).await?;
-    // TODO: Remove its for debugging only
 
     let mut headers = HeaderMap::new();
     headers.insert(

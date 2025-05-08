@@ -1,16 +1,19 @@
 // Quick helper for easier to read sizes
 macro_rules! size {
+    ($val:literal) => {
+        $val
+    };
     ($val:literal K) => {
-        ($val as usize) * 1024
+        size!($val) * 1024
     };
     ($val:literal M) => {
-        ($val as usize) * 1024 * 1024
+        size!($val K) * 1024
     };
     ($val:literal G) => {
-        ($val as usize) * 1024 * 1024 * 1024
+        size!($val M) * 1024
     };
     ($val:literal T) => {
-        ($val as usize) * 1024 * 1024 * 1024 * 1024
+        size!($val G) * 1024
     };
 }
 

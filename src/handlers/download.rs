@@ -70,6 +70,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
 }
 
 async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<UploadHandle>)> {
+    // Path traversal is might be possible here, check if try_exists with a malicious path causes issues
     let res = match fs::try_exists(&format!("data/{path}/meta.toml")).await.ok() {
         // Regular download
         Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),

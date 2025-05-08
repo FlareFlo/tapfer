@@ -1,19 +1,24 @@
+use std::str::FromStr;
+use std::sync::LazyLock;
 use crate::error::{TapferError, TapferResult};
-use crate::file_meta::{FileMetaBuilder, RemovalPolicy};
+use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
-use crate::upload_pool::UPLOAD_POOL;
-use axum::extract::Multipart;
+use crate::upload_pool::{UploadHandle, UPLOAD_POOL};
+use axum::extract::{Multipart, Path};
 use axum::extract::multipart::Field;
 use axum::http::header::CONTENT_LENGTH;
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
 use std::time::Duration as StdDuration;
+use dashmap::DashMap;
 use time::Duration as TimeDuration;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::sleep;
 use uuid::Uuid;
+
+pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(|| DashMap::new());
 
 pub async fn accept_form(multipart: Multipart) -> TapferResult<impl IntoResponse> {
     let uuid = Uuid::new_v4();
@@ -39,6 +44,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
         }
     };
     let mut size: Option<u64> = None;
+    let mut in_progress_token: Option<u32> = None;
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
@@ -46,7 +52,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             .to_string();
         match name.as_str() {
             "file" => {
-                payload_field(field, uuid, meta.clone(), size).await?;
+                payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;
                 got_file = true;
             }
             "expiration" => {
@@ -55,6 +61,10 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             }
             "file_size" => {
                 size = Some(field.text().await?.parse()?);
+            }
+            "in_progress_token" => {
+                in_progress_token = Some(field.text().await?.parse()?);
+                PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
             }
             _ => {
                 Err(TapferError::UnknownMultipartField {
@@ -71,7 +81,14 @@ async fn payload_field(
     uuid: Uuid,
     metadata_builder: FileMetaBuilder,
     size: Option<u64>,
+    in_progress_token: Option<u32>,
 ) -> TapferResult<()> {
+    let _ = scopeguard::guard(in_progress_token, |v|{
+        if let Some(t) = v {
+            PROGRESS_TOKEN_LUT.remove(&t);
+        }
+    });
+
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
@@ -112,4 +129,9 @@ async fn expiration_field(field: Field<'_>, meta: &mut FileMetaBuilder) -> Tapfe
         _ => {}
     }
     Ok(())
+}
+
+pub async fn progress_token_to_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+    let token = u32::from_str(&path)?;
+    Ok(PROGRESS_TOKEN_LUT.get(&token).ok_or(TapferError::TokenDoesNotExist(token))?.to_string())
 }

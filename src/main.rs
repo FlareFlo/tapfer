@@ -33,6 +33,7 @@ async fn main() -> TapferResult<()> {
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route("/uploads/{uuid}", get(handlers::download::download_html))
+        .route("/uploads/query_uuid/{token}", get(handlers::upload::progress_token_to_uuid))
         .route(
             "/uploads/{uuid}/download",
             get(handlers::download::download_file),

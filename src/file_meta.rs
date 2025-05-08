@@ -111,6 +111,7 @@ impl FileMeta {
 #[derive(Debug, Clone, Default)]
 pub struct FileMetaBuilder {
     pub expiration: Option<RemovalPolicy>,
+    pub in_progress_token: Option<u32>,
 }
 
 impl FileMetaBuilder {

@@ -31,6 +31,7 @@
 		<option value="24_hours">Delete after 24 hours</option>
 	</select>
 	<input type="hidden" name="file_size", value="0">
+	<input type="hidden" name="in_progress_token", value="">
 
 	<label>
 		Choose file to upload:
@@ -43,12 +44,18 @@
     document.getElementById('uploadForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        const random_seed =  array[0];
+
         const form = e.target;
         const formData = new FormData(form);
         const xhr = new XMLHttpRequest();
         const fileInput = form.querySelector('input[name="file"]');
         const file = fileInput.files[0];
         formData.set("file_size", file.size);
+        // TODO: Request the UUID for this token once the POST is dispatched
+        formData.set("in_progress_token", random_seed.toString());
 
         form.style.backgroundSize = '0% 100%';
 

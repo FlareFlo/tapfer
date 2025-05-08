@@ -838,6 +838,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "human_bytes",
+ "scopeguard",
  "serde",
  "thiserror",
  "time",

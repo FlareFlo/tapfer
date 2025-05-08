@@ -25,6 +25,9 @@ pub enum TapferError {
 
     #[error("Attempted to add size to already known size")]
     AddSizeToAlreadyKnown,
+    
+    #[error("The requested token {0} does not have a matching UUID/upload")]
+    TokenDoesNotExist(u32),
 
     #[error(transparent)]
     StdIo(#[from] io::Error),
@@ -77,6 +80,7 @@ impl IntoResponse for TapferError {
             TapferError::ParseIntError(_) => generic("parse int error"),
             TapferError::ToStrError(_) => generic("to str error"),
             TapferError::AddSizeToAlreadyKnown => generic("add size to already known"),
+            TapferError::TokenDoesNotExist(_) => generic("token does not exist"),
         }
     }
 }

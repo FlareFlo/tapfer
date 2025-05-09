@@ -1,3 +1,4 @@
+use std::env;
 use crate::error::{TapferResult};
 use axum::body::Body;
 use axum::extract::Path;
@@ -11,13 +12,13 @@ pub async fn get_qrcode_from_uuid(
     Path(path): Path<String>,
 ) -> TapferResult<impl IntoResponse> {
     let uuid = Uuid::parse_str(&path)?;
-    let host = uri.host();
-    let method = if host.is_some() { "https://" } else { "" };
+    let host = env::var("HOST").expect("Should ok as main checks this var already");
+    let method = if host != "localhost" { "https://" } else { "" };
     let qrc = qrcode_generator::to_png_to_vec(
         format!(
             "{}{}/uploads/{uuid}",
             method,
-            host.unwrap_or("localhost:3000"),
+            host,
         )
         .as_bytes(),
         QrCodeEcc::Medium,

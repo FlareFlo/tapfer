@@ -1,12 +1,14 @@
 use crate::error::TapferResult;
 use crate::file_meta::FileMeta;
 use std::ops::Add;
+use std::str::FromStr;
 use std::sync::LazyLock;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
 use tracing::info;
 use uuid::Uuid;
+use crate::upload_pool::UPLOAD_POOL;
 
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(|| GlobalRetentionPolicy::default());
@@ -54,12 +56,17 @@ pub async fn check_all_assets() -> TapferResult<()> {
         if let Ok(meta) = FileMeta::read_from_uuid_path(&entry.path()).await {
             check_against_global_retention(meta, now).await?;
         } else {
-            // Delete asset straight up when metadata is missing or corrupt
-            info!(
+            let uuid = Uuid::from_str(&entry.path().to_string_lossy())?;
+            
+            // Only delete element if it isn't in progress
+            if !UPLOAD_POOL.uploads.contains_key(&uuid) {
+                // Delete asset straight up when metadata is missing or corrupt
+                info!(
                 "Deleting {} as its metadata appears corrupt",
                 entry.path().as_os_str().to_string_lossy()
             );
-            remove_dir_all(entry.path()).await?;
+                remove_dir_all(entry.path()).await?;
+            }
         };
     }
     Ok(())

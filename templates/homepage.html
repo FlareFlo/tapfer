@@ -38,6 +38,10 @@
                 white-space: nowrap;
             }
         }
+		#qrcode {
+			filter: blur(5px);
+			transition: filter 0.5s ease;
+		}
 	</style>
 </head>
 <body>
@@ -62,6 +66,7 @@
 		<a id="downloadURL" href="" target="_blank">Download URL</a>
 		<button>Copy to clipboard</button>
 	</div>
+	<img id="qrcode" src="/graphics/unused_qr.png">
 </div>
 
 <script>
@@ -105,13 +110,17 @@
 
             const token_xhr = new XMLHttpRequest();
             token_xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
+            const qrcode = document.getElementById('qrcode');
 
-            token_xhr.onload = function () {
+            token_xhr.onload = async function () {
                 if (token_xhr.status >= 200 && token_xhr.status < 300) {
                     const urlelem = document.getElementById('downloadURL');
                     const url = `/uploads/${token_xhr.responseText}`;
                     urlelem.href = url;
                     urlelem.innerText = token_xhr.responseText;
+
+                    qrcode.src = `/qrcg/${token_xhr.responseText}`;
+                    qrcode.style.filter = 'none';
                 }
             };
 

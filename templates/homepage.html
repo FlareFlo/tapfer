@@ -74,7 +74,7 @@
 
         const form = e.target;
         const formData = new FormData(form);
-        const xhr = new XMLHttpRequest();
+        const main_xhr = new XMLHttpRequest();
         const fileInput = form.querySelector('input[name="file"]');
         const file = fileInput.files[0];
         formData.set("file_size", file.size);
@@ -85,7 +85,7 @@
 
         background.style.backgroundSize = '0% 100%';
 
-        xhr.upload.addEventListener('progress', function (e) {
+        main_xhr.upload.addEventListener('progress', function (e) {
             if (e.lengthComputable) {
                 const percent = (e.loaded / e.total) * 100;
                 background.style.backgroundSize = percent + '% 100%';
@@ -93,35 +93,45 @@
             }
         });
 
-        xhr.upload.addEventListener('progress', function (e) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
+        let fired = false;
 
-            xhr.onload = function () {
-                if (xhr.status >= 200 && xhr.status < 300) {
+        main_xhr.upload.addEventListener('progress', function (e) {
+            if (fired) {return;}
+            // Do not send uuid request when less than a megabyte has been transferred
+			// This is both:
+			// a hack ensuring the backend registered the uuid token and;
+			// a measure to protect the backend from getting a request with tiny payloads that complete instantly
+            if (e.loaded < 1024 * 1024) {return;};
+
+            const token_xhr = new XMLHttpRequest();
+            token_xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
+
+            token_xhr.onload = function () {
+                if (token_xhr.status >= 200 && token_xhr.status < 300) {
                     const urlelem = document.getElementById('downloadURL');
-                    const url = `/uploads/${xhr.responseText}`;
+                    const url = `/uploads/${token_xhr.responseText}`;
                     urlelem.href = url;
-                    urlelem.innerText = xhr.responseText;
+                    urlelem.innerText = token_xhr.responseText;
                 }
             };
 
 
-            xhr.send();
-        }, { once: true });
+            token_xhr.send();
+            fired = true;
+        });
 
-        xhr.onload = function () {
+        main_xhr.onload = function () {
             // Follow redirect to upload location
-            if (xhr.status >= 200 && xhr.status < 300) {
-                window.location.href = xhr.responseURL;
+            if (main_xhr.status >= 200 && main_xhr.status < 300) {
+                window.location.href = main_xhr.responseURL;
             } else {
                 alert('Upload failed.');
                 background.style.backgroundSize = '0% 100%';
             }
         };
 
-        xhr.open('POST', '/', true);
-        xhr.send(formData);
+        main_xhr.open('POST', '/', true);
+        main_xhr.send(formData);
     });
 </script>
 </body>

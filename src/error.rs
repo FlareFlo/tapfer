@@ -2,6 +2,7 @@ use axum::extract::multipart::MultipartError;
 use axum::http::StatusCode;
 use axum::http::header::{InvalidHeaderValue, ToStrError};
 use axum::response::{Html, IntoResponse, Response};
+use qrcode_generator::QRCodeError;
 use std::io;
 use std::num::ParseIntError;
 
@@ -25,7 +26,7 @@ pub enum TapferError {
 
     #[error("Attempted to add size to already known size")]
     AddSizeToAlreadyKnown,
-    
+
     #[error("The requested token {0} does not have a matching UUID/upload")]
     TokenDoesNotExist(u32),
 
@@ -55,6 +56,9 @@ pub enum TapferError {
 
     #[error(transparent)]
     ToStrError(#[from] ToStrError),
+
+    #[error(transparent)]
+    QRCodeError(#[from] QRCodeError),
 }
 
 impl IntoResponse for TapferError {
@@ -81,6 +85,7 @@ impl IntoResponse for TapferError {
             TapferError::ToStrError(_) => generic("to str error"),
             TapferError::AddSizeToAlreadyKnown => generic("add size to already known"),
             TapferError::TokenDoesNotExist(_) => generic("token does not exist"),
+            TapferError::QRCodeError(_) => generic("qr code generation"),
         }
     }
 }

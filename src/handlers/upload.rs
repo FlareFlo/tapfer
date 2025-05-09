@@ -1,17 +1,17 @@
-use std::str::FromStr;
-use std::sync::LazyLock;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
-use crate::upload_pool::{UploadHandle, UPLOAD_POOL};
-use axum::extract::{Multipart, Path};
+use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
 use axum::extract::multipart::Field;
+use axum::extract::{Multipart, Path};
 use axum::http::header::CONTENT_LENGTH;
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
-use std::time::Duration as StdDuration;
 use dashmap::DashMap;
 use scopeguard::defer;
+use std::str::FromStr;
+use std::sync::LazyLock;
+use std::time::Duration as StdDuration;
 use time::Duration as TimeDuration;
 use tokio::fs;
 use tokio::fs::File;
@@ -57,8 +57,10 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
         debug!("reading field {name}");
         match name.as_str() {
             "file" => {
-                if size.is_some() != in_progress_token.is_some() {  
-                    warn!("Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?");
+                if size.is_some() != in_progress_token.is_some() {
+                    warn!(
+                        "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?"
+                    );
                 }
                 payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;
                 got_file = true;
@@ -82,7 +84,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             }
         }
     }
-    defer!{
+    defer! {
         if let Some(t) = in_progress_token {
             info!("deleting progress token {t}");
             PROGRESS_TOKEN_LUT.remove(&t);
@@ -141,5 +143,8 @@ async fn expiration_field(field: Field<'_>, meta: &mut FileMetaBuilder) -> Tapfe
 
 pub async fn progress_token_to_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let token = u32::from_str(&path)?;
-    Ok(PROGRESS_TOKEN_LUT.get(&token).ok_or(TapferError::TokenDoesNotExist(token))?.to_string())
+    Ok(PROGRESS_TOKEN_LUT
+        .get(&token)
+        .ok_or(TapferError::TokenDoesNotExist(token))?
+        .to_string())
 }

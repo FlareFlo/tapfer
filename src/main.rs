@@ -1,25 +1,25 @@
+mod configuration;
 mod error;
 mod file_meta;
 mod handlers;
 mod retention_control;
 mod upload_pool;
-mod configuration;
 
+use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::handlers::upload;
 use crate::retention_control::{GLOBAL_RETENTION_POLICY, check_all_assets};
+use axum::response::IntoResponse;
+use axum::routing::get_service;
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use handlers::homepage;
 use std::fs;
 use std::time::Duration;
-use axum::response::IntoResponse;
-use axum::routing::get_service;
 use tokio::time::sleep;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use crate::configuration::MAX_UPLOAD_SIZE;
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
@@ -27,7 +27,7 @@ async fn main() -> TapferResult<()> {
         error!("Caught CTRL-C... Exiting right away");
         std::process::exit(1);
     })
-        .expect("Error setting Ctrl-C handler");
+    .expect("Error setting Ctrl-C handler");
 
     tracing_subscriber::registry()
         .with(
@@ -46,15 +46,17 @@ async fn main() -> TapferResult<()> {
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route("/uploads/{uuid}", get(handlers::download::download_html))
-        .route("/uploads/query_uuid/{token}", get(handlers::upload::progress_token_to_uuid))
+        .route(
+            "/uploads/query_uuid/{token}",
+            get(handlers::upload::progress_token_to_uuid),
+        )
         .route(
             "/uploads/{uuid}/download",
             get(handlers::download::download_file),
         )
+        .route("/qrcg/{uuid}", get(handlers::qrcode::get_qrcode_from_uuid))
         .layer(DefaultBodyLimit::disable())
-        .layer(RequestBodyLimitLayer::new(
-            MAX_UPLOAD_SIZE,
-        ))
+        .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/graphics", graphics_dir_service);
 

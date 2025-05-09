@@ -1,3 +1,4 @@
+use crate::configuration::DOWNLOAD_CHUNKSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers;
@@ -25,7 +26,6 @@ use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
 use uuid::Uuid;
-use crate::configuration::DOWNLOAD_CHUNKSIZE;
 
 #[derive(Template)]
 #[template(path = "download.html")]

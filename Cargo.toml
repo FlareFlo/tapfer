@@ -24,3 +24,4 @@ thiserror = "2.0.12"
 dashmap = "6.1.0"
 scopeguard = "1.2.0"
 ctrlc = { version = "3.4.6", features = ["termination"]}
+qrcode-generator = "5.0.0"

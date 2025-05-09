@@ -1,7 +1,7 @@
 services:
   webserver:
     environment:
-      HOST: "lkl.lol"
+      HOST: ""
     build:
       context: .
       dockerfile: Dockerfile

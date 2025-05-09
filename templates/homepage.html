@@ -66,16 +66,18 @@
 		<a id="downloadURL" href="" target="_blank">Download URL</a>
 		<button id="copylink">Copy to clipboard</button>
 	</div>
-	<img id="qrcode" src="/graphics/unused_qr.png" width="200", height="200">
+	<img id="qrcode" src="/graphics/unused_qr.png" width="200", height="200" alt="placeholder qrcode">
 </div>
 
 <script>
     const copylink = document.getElementById("copylink");
     const downloadURL = document.getElementById("downloadURL");
     copylink.addEventListener("click", () => {
-        navigator.clipboard.writeText(downloadURL.href);
-        copylink.innerText = "Copied!";
-	})
+        if (copylink.href === "") {
+            navigator.clipboard.writeText(downloadURL.href);
+            copylink.innerText = "Copied!";
+		}
+	});
 
     document.getElementById('uploadForm').addEventListener('submit', function (e) {
         e.preventDefault();

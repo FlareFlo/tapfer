@@ -23,6 +23,5 @@ pub async fn get_qrcode_from_uuid(
         QrCodeEcc::Medium,
         200,
     )?;
-    println!("{}", qrc.len());
     Ok((Body::from(qrc)))
 }

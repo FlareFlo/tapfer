@@ -54,7 +54,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             .to_string();
         match name.as_str() {
             "file" => {
-                if size.is_some() == in_progress_token.is_some() {  
+                if size.is_some() != in_progress_token.is_some() {  
                     warn!("Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?");
                 }
                 payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;

@@ -105,7 +105,6 @@
 
             const token_xhr = new XMLHttpRequest();
             token_xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
-            token_xhr.setRequestHeader("X-Accel-Buffering", "no");
 
             token_xhr.onload = function () {
                 if (token_xhr.status >= 200 && token_xhr.status < 300) {
@@ -132,7 +131,6 @@
         };
 
         main_xhr.open('POST', '/', true);
-        main_xhr.setRequestHeader("X-Accel-Buffering", "no");
         main_xhr.send(formData);
     });
 </script>

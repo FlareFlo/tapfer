@@ -13,8 +13,8 @@ use axum::response::IntoResponse;
 use axum::routing::get_service;
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use handlers::homepage;
-use std::{env, fs};
 use std::time::Duration;
+use std::{env, fs};
 use tokio::time::sleep;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
@@ -23,10 +23,12 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
-    if env::var("HOST").is_err() { 
-        panic!("Please set the environment variable HOST containing the domain tapfer is served on");
+    if env::var("HOST").is_err() {
+        panic!(
+            "Please set the environment variable HOST containing the domain tapfer is served on"
+        );
     }
-    
+
     ctrlc::set_handler(move || {
         error!("Caught CTRL-C... Exiting right away");
         std::process::exit(1);

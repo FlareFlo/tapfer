@@ -1,10 +1,10 @@
-use std::env;
-use crate::error::{TapferResult};
+use crate::error::TapferResult;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::http;
 use axum::response::IntoResponse;
 use qrcode_generator::QrCodeEcc;
+use std::env;
 use uuid::Uuid;
 
 pub async fn get_qrcode_from_uuid(
@@ -15,12 +15,7 @@ pub async fn get_qrcode_from_uuid(
     let host = env::var("HOST").expect("Should ok as main checks this var already");
     let method = if host != "localhost" { "https://" } else { "" };
     let qrc = qrcode_generator::to_png_to_vec(
-        format!(
-            "{}{}/uploads/{uuid}",
-            method,
-            host,
-        )
-        .as_bytes(),
+        format!("{}{}/uploads/{uuid}", method, host,).as_bytes(),
         QrCodeEcc::Medium,
         200,
     )?;

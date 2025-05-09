@@ -1,3 +1,4 @@
+use crate::configuration::{DOWNLOAD_CHUNKSIZE, UPLOAD_BUFSIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
@@ -8,15 +9,21 @@ use axum::http::header::CONTENT_LENGTH;
 use axum::http::{HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
 use dashmap::DashMap;
+use futures_util::TryStreamExt;
 use scopeguard::defer;
+use std::io::Error;
+use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::sync::LazyLock;
-use std::time::Duration as StdDuration;
+use std::task::{Context, Poll};
+use std::time::{Duration as StdDuration, Duration};
 use time::Duration as TimeDuration;
-use tokio::fs;
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWrite, AsyncWriteExt, BufReader, copy_buf, BufWriter, AsyncRead};
+use tokio::task::block_in_place;
 use tokio::time::sleep;
+use tokio::{fs, task};
+use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -106,17 +113,13 @@ async fn payload_field(
     let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client
     let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
-    let mut f = File::create(format!("data/{uuid}/{file_name}")).await?;
-    while let Some(chunk) = field.chunk().await? {
-        f.write_all(&chunk).await?;
-
-        // Increment the updown handle when applicable, otherwise, keep track of the dynamic filesize
-        handle.add_progress(chunk.len()).await;
-        if size.is_none() {
-            metadata.add_size(chunk.len() as _)?;
-        }
-        // sleep(StdDuration::from_micros(2000)).await; // Debug slowdown for live upload and download
-    }
+    let f = File::create(format!("data/{uuid}/{file_name}")).await?;
+    let mut f = WriterProgress::new(f, handle.clone(), metadata, size.is_none());
+    let mut s = BufReader::with_capacity(UPLOAD_BUFSIZE, StreamReader::new(
+        field.map_err(|e| TapferError::AxumMultipart(e)),
+    ));
+    tokio::io::copy(&mut s, &mut f).await?;
+    let metadata = f.disassemble();
     fs::write(
         format!("data/{uuid}/meta.toml"),
         toml::to_string_pretty(&metadata)?.as_bytes(),
@@ -147,4 +150,58 @@ pub async fn progress_token_to_uuid(Path(path): Path<String>) -> TapferResult<im
         .get(&token)
         .ok_or(TapferError::TokenDoesNotExist(token))?
         .to_string())
+}
+
+pub struct WriterProgress<S> {
+    file: S,
+    upload_handle: UploadHandle,
+    metadata: FileMeta,
+    write_to_meta: bool,
+}
+
+impl<S> WriterProgress<S> {
+    pub fn new(file: S, upload_handle: UploadHandle, metadata: FileMeta, write_to_meta: bool) -> Self {
+        Self {
+            file,
+            upload_handle,
+            metadata,
+            write_to_meta,
+        }
+    }
+    
+    pub fn disassemble(self) -> FileMeta {
+        self.metadata
+    }
+}
+
+impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, Error>> {
+        let mut pinned = pin!(&mut self.file);
+        let pollres = pinned.as_mut().poll_write(cx, buf);
+        match pollres {
+            Poll::Ready(Ok(n)) => {
+                if self.write_to_meta {  
+                    self.metadata.add_size(n as u64).expect("since write_to_meta is set this should not panic");
+                }
+                let handle = self.upload_handle.clone();
+                task::spawn(async move {handle.add_progress(n).await});
+            }
+            _ => {}
+        }
+        pollres
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        let mut pinned = pin!(&mut self.file);
+        pinned.as_mut().poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        let mut pinned = pin!(&mut self.file);
+        pinned.as_mut().poll_shutdown(cx)
+    }
 }

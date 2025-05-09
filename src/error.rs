@@ -89,3 +89,9 @@ impl IntoResponse for TapferError {
         }
     }
 }
+
+impl From<TapferError> for io::Error {
+    fn from(t: TapferError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidData, t.to_string())
+    }
+}

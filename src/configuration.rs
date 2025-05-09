@@ -20,3 +20,5 @@ macro_rules! size {
 pub const MAX_UPLOAD_SIZE: usize = size!(100 G);
 
 pub const DOWNLOAD_CHUNKSIZE: usize = size!(1 M);
+
+pub const UPLOAD_BUFSIZE: usize = size!(100 M);

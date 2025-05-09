@@ -17,7 +17,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::sleep;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(|| DashMap::new());
@@ -54,6 +54,7 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
             .name()
             .ok_or(TapferError::MultipartFieldNameMissing)?
             .to_string();
+        debug!("reading field {name}");
         match name.as_str() {
             "file" => {
                 if size.is_some() != in_progress_token.is_some() {  

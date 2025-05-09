@@ -36,6 +36,7 @@ struct DownloadTemplate<'a> {
     download_url: &'a str,
     mimetype: &'a str,
     filesize: &'a str,
+    uuid: Uuid,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
@@ -63,6 +64,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
                 &human_bytes(meta.size() as f64)
             }
         },
+        uuid,
     };
 
     Ok(Html(template.render()?))

@@ -63,6 +63,7 @@
 	</form>
 
 	<div>
+		<div id="progresstext">0/0</div>
 		<a id="downloadURL" href="" target="_blank">Download URL</a>
 		<button id="copylink">Copy to clipboard</button>
 	</div>
@@ -72,6 +73,7 @@
 <script>
     const copylink = document.getElementById("copylink");
     const downloadURL = document.getElementById("downloadURL");
+    const progresstext = document.getElementById("progresstext");
     copylink.addEventListener("click", () => {
         if (copylink.href === "") {
             navigator.clipboard.writeText(downloadURL.href);
@@ -99,11 +101,23 @@
 
         background.style.backgroundSize = '0% 100%';
 
+        let last_progress = Date.now();
+        let last_loaded = 0;
+
         main_xhr.upload.addEventListener('progress', function (e) {
             if (e.lengthComputable) {
                 const percent = (e.loaded / e.total) * 100;
                 background.style.backgroundSize = percent + '% 100%';
                 percentageElement.innerText = `${percent.toFixed(1)}%`;
+
+                const now = Date.now();
+                const elapsed = (now - last_progress) / 1000;// seconds not millis
+				console.log(elapsed);
+                const bytes_since_last = e.loaded - last_loaded;
+                const speedBps = bytes_since_last / (elapsed || 1); // bytes per second (avoid divide by zero)
+                progresstext.innerText = `${(e.loaded / 1024 / 1024).toFixed(1)}MB / ${(e.total / 1024 / 1024).toFixed(1)}MB ${(speedBps / 1024 / 1024).toFixed(1)}MB/s`;
+                last_progress = now;
+                last_loaded = e.loaded;
             }
         });
 

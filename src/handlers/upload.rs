@@ -118,7 +118,7 @@ async fn payload_field(
     let mut s = BufReader::with_capacity(UPLOAD_BUFSIZE, StreamReader::new(
         field.map_err(|e| TapferError::AxumMultipart(e)),
     ));
-    tokio::io::copy(&mut s, &mut f).await?;
+    copy_buf(&mut s, &mut f).await?;
     let metadata = f.disassemble();
     fs::write(
         format!("data/{uuid}/meta.toml"),

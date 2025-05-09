@@ -26,11 +26,13 @@ pub async fn accept_form(multipart: Multipart) -> TapferResult<impl IntoResponse
     let uuid = Uuid::new_v4();
     fs::create_dir(&format!("data/{uuid}")).await?;
 
+    info!("Beginning upload of {uuid}");
     let res = do_upload(multipart, uuid).await;
     if res.is_err() {
         delete_asset(uuid).await?;
     }
     res?;
+    info!("Completed upload of {uuid}");
 
     Ok(Redirect::to(&format!("/uploads/{}", uuid)))
 }

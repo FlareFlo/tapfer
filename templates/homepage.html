@@ -11,10 +11,7 @@
             position: relative;
             z-index: 1;
             padding: 2em;
-            max-width: 500px;
             margin: auto;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
 
             /* PROGRESS GRADIENT */
             background-image: linear-gradient(to right, #4caf50, #4caf50);
@@ -23,21 +20,23 @@
             background-color: #ffffff; /* fallback background */
             transition: background-size 0.2s ease;
 
-            #blurred-percentage {
-                position: absolute;
-                width: 100%;
-                height: 100%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 10vw; /* Adjust this to fine-tune fit */
-                color: rgba(0, 0, 0, 0.15);
-                user-select: none;
-                pointer-events: none;
-                z-index: 0;
-                white-space: nowrap;
-            }
         }
+
+        #blurred-percentage {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15em; /* Adjust this to fine-tune fit */
+            color: rgba(0, 0, 0, 0.1);
+            user-select: none;
+            pointer-events: none;
+            z-index: 2;
+            white-space: nowrap;
+        }
+
 		#qrcode {
 			filter: blur(5px);
 			transition: filter 0.5s ease;
@@ -45,30 +44,34 @@
 	</style>
 </head>
 <body>
-<div class="flex-container" id="uploadBox">
+<section class="container">
 	<div id="blurred-percentage"></div>
-	<form id="uploadForm">
-		<select name="expiration">
-			<option value="single_download" selected="selected">Delete after one download</option>
-			<option value="24_hours">Delete after 24 hours</option>
-		</select>
-		<input type="hidden" name="file_size", value="0">
-		<input type="hidden" name="in_progress_token", value="">
+	<div class="form-box" id="uploadBox">
+		<div class="container">
+			<form id="uploadForm">
+				<select name="expiration">
+					<option value="single_download" selected="selected">Delete after one download</option>
+					<option value="24_hours">Delete after 24 hours</option>
+				</select>
+				<input type="hidden" name="file_size", value="0">
+				<input type="hidden" name="in_progress_token", value="">
 
-		<label>
-			Choose file to upload:
-			<input type="file" name="file" required>
-		</label>
-		<input type="submit" value="Upload files">
-	</form>
+				<label>
+					Choose file to upload:
+					<input type="file" name="file" required>
+				</label>
+				<input type="submit" value="Upload files">
+			</form>
 
-	<div>
-		<div id="progresstext">0/0</div>
-		<a id="downloadURL" href="" target="_blank">Download URL</a>
-		<button id="copylink">Copy to clipboard</button>
+			<div>
+				<div id="progresstext">0MB/0MB 0MB/s</div>
+				<a id="downloadURL" href="" target="_blank">Download URL</a>
+				<button id="copylink">Copy to clipboard</button>
+			</div>
+			<img id="qrcode" src="/graphics/unused_qr.png" width="200", height="200" alt="placeholder qrcode">
+		</div>
 	</div>
-	<img id="qrcode" src="/graphics/unused_qr.png" width="200", height="200" alt="placeholder qrcode">
-</div>
+</section>
 
 <script>
     const copylink = document.getElementById("copylink");

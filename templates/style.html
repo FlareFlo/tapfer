@@ -10,24 +10,14 @@
         background-color: #f4f4f4;
     }
 
-    form {
-        padding: 2rem 3rem;
-        border-radius: 12px;
-        text-align: center;
-
-        display: flex;
-
-        justify-content: center;
-        align-items: center;
-        /* flex-flow: column; */
-        flex-direction: column;
+    * {
+        box-sizing: border-box;
     }
 
-    label {
-        display: block;
-        margin-bottom: 1rem;
-        font-size: 1rem;
-        color: #333;
+    body, html {
+        height: 100%;
+        margin: 0;
+        font-family: Arial, sans-serif;
     }
 
     input[type="file"] {
@@ -51,19 +41,27 @@
         background-color: #1a96ef;
     }
 
-    .flex-container {
-
+    .container {
         display: flex;
-
         justify-content: center;
         align-items: center;
-        /* flex-flow: column; */
+        height: 100%;
+        background: #f2f2f2;
         flex-direction: column;
+        gap: 2rem;
+        padding: 1rem;
+    }
 
-        height: 45vh;
-        padding: 15px;
-        gap: 5px;
-
+    .form-box {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+        max-width: 50vw;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
 </style>

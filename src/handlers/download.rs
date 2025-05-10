@@ -127,7 +127,7 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
     let stream = ReaderStream::with_capacity(file, DOWNLOAD_CHUNKSIZE);
-    let wrapped = DownloadStream::new(stream, uuid, meta, handle);
+    let wrapped = DownloadStream::new(stream, uuid, meta, handle, UPLOAD_POOL.uploads.contains_key(&uuid));
     Ok((headers, Body::from_stream(wrapped)))
 }
 
@@ -138,6 +138,7 @@ struct DownloadStream {
     uuid: Uuid,
     handle: Option<UploadHandle>,
     self_progress: usize,
+    is_updown: bool,
 }
 
 impl DownloadStream {
@@ -146,6 +147,7 @@ impl DownloadStream {
         uuid: Uuid,
         meta: FileMeta,
         handle: Option<UploadHandle>,
+        is_updown: bool,
     ) -> Self {
         Self {
             inner,
@@ -153,19 +155,21 @@ impl DownloadStream {
             uuid,
             handle,
             self_progress: 0,
+            is_updown,
         }
     }
 }
 
 impl Drop for DownloadStream {
     fn drop(&mut self) {
+        // Do not delete files in upload when an in-progress download fails early
+        if self.is_updown {
+            return;
+        }
         let meta = self.meta.clone();
         let uuid = self.uuid;
+        
         tokio::spawn(async move {
-            // Do not delete files in upload when an in-progress download fails early
-            if UPLOAD_POOL.uploads.contains_key(&uuid) {
-                return;
-            }
             if meta.remove_after_download() {
                 info!("Removing {uuid} as its download has completed");
                 match delete_asset(uuid).await {

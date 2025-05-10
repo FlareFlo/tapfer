@@ -107,6 +107,10 @@
         let last_progress = Date.now();
         let last_loaded = 0;
 
+        // Circular buffer for recent speed samples
+        const speedSamples = [];
+        const maxSamples = 300;
+
         main_xhr.upload.addEventListener('progress', function (e) {
             if (e.lengthComputable) {
                 const percent = (e.loaded / e.total) * 100;
@@ -118,7 +122,15 @@
 				console.log(elapsed);
                 const bytes_since_last = e.loaded - last_loaded;
                 const speedBps = bytes_since_last / (elapsed || 1); // bytes per second (avoid divide by zero)
-                progresstext.innerText = `${(e.loaded / 1024 / 1024).toFixed(1)}MB / ${(e.total / 1024 / 1024).toFixed(1)}MB ${(speedBps / 1024 / 1024).toFixed(1)}MB/s`;
+
+                speedSamples.push(speedBps);
+                if (speedSamples.length > maxSamples) {
+                    speedSamples.shift(); // remove oldest
+                }
+
+                const averageSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
+
+                progresstext.innerText = `${(e.loaded / 1024 / 1024).toFixed(1)}MB / ${(e.total / 1024 / 1024).toFixed(1)}MB ${(averageSpeed / 1024 / 1024).toFixed(1)}MB/s`;
                 last_progress = now;
                 last_loaded = e.loaded;
             }

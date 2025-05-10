@@ -1,3 +1,4 @@
+use std::thread::sleep;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, UPLOAD_BUFSIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
@@ -21,7 +22,6 @@ use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, AsyncWriteExt, BufReader, copy_buf, BufWriter, AsyncRead};
 use tokio::task::block_in_place;
-use tokio::time::sleep;
 use tokio::{fs, task};
 use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::{debug, info, warn};
@@ -192,6 +192,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
             }
             _ => {}
         }
+        sleep(Duration::from_millis(50));
         pollres
     }
 

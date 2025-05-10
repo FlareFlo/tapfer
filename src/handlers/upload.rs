@@ -192,7 +192,6 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
             }
             _ => {}
         }
-        sleep(Duration::from_millis(50));
         pollres
     }
 

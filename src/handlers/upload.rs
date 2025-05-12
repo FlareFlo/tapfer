@@ -75,8 +75,8 @@ async fn do_upload(
 
     expiration_field(headers.get("tapfer_expiration"), &mut meta).await?;
 
-    info!("Adding progress token {in_progress_token:?}");
-    PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
+    // info!("Adding progress token {in_progress_token:?}");
+    // PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
 
     while let Some(field) = multipart.next_field().await? {
         dbg!(field.headers());

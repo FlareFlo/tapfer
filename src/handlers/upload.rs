@@ -55,31 +55,30 @@ async fn do_upload(
     let mut meta = FileMetaBuilder::default();
 
     let size: Option<u64> = headers
-        .get("tapfer_file_size")
+        .get("tapfer-file-size")
         .map(|h| h.to_str())
         .transpose()?
         .map(|h| h.parse::<u64>())
         .transpose()?;
     let in_progress_token: Option<u32> = headers
-        .get("tapfer_progress_token")
+        .get("tapfer-progress-token")
         .map(|h| h.to_str())
         .transpose()?
         .map(|h| h.parse())
         .transpose()?;
 
-    if size.is_some() != in_progress_token.is_some()  || true {
+    if size.is_some() != in_progress_token.is_some() {
         warn!(
-            "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?\n Headers: {headers:?}"
+            "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?"
         );
     }
 
-    expiration_field(headers.get("tapfer_expiration"), &mut meta).await?;
+    expiration_field(headers.get("tapfer-expiration"), &mut meta).await?;
 
-    // info!("Adding progress token {in_progress_token:?}");
-    // PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
+    info!("Adding progress token {in_progress_token:?}");
+    PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
 
     while let Some(field) = multipart.next_field().await? {
-        dbg!(field.headers());
         let name = field
             .name()
             .ok_or(TapferError::MultipartFieldNameMissing)?

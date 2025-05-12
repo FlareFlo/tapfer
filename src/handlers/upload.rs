@@ -79,6 +79,7 @@ async fn do_upload(
     PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
 
     while let Some(field) = multipart.next_field().await? {
+        dbg!(field.headers());
         let name = field
             .name()
             .ok_or(TapferError::MultipartFieldNameMissing)?

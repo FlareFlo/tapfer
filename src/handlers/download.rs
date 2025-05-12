@@ -201,7 +201,7 @@ impl futures_core::Stream for DownloadStream {
             {
                 let waker = cx.waker().clone();
                 tokio::spawn(async {
-                    sleep(Duration::from_millis(100)).await;
+                    sleep(Duration::from_millis(10)).await;
                     waker.wake();
                 });
                 return Poll::Pending;

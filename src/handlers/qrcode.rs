@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use qrcode_generator::QrCodeEcc;
 use std::env;
 use uuid::Uuid;
+use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
 
 pub async fn get_qrcode_from_uuid(
     uri: http::Uri,
@@ -16,8 +17,8 @@ pub async fn get_qrcode_from_uuid(
     let method = if host != "localhost" { "https://" } else { "" };
     let qrc = qrcode_generator::to_png_to_vec(
         format!("{}{}/uploads/{uuid}", method, host,).as_bytes(),
-        QrCodeEcc::Medium,
-        200,
+        QR_CODE_ECC,
+        QR_CODE_SIZE,
     )?;
-    Ok((Body::from(qrc)))
+    Ok(Body::from(qrc))
 }

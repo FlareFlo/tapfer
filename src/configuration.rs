@@ -1,3 +1,5 @@
+use qrcode_generator::QrCodeEcc;
+
 // Quick helper for easier to read sizes
 macro_rules! size {
     ($val:literal) => {
@@ -22,3 +24,6 @@ pub const MAX_UPLOAD_SIZE: usize = size!(100 G);
 pub const DOWNLOAD_CHUNKSIZE: usize = size!(1 M);
 
 pub const UPLOAD_BUFSIZE: usize = size!(100 M);
+
+pub const QR_CODE_SIZE: usize = 200; // pixels
+pub const QR_CODE_ECC: QrCodeEcc = QrCodeEcc::Medium;

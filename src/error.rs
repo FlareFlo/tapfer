@@ -1,3 +1,4 @@
+use time::error::Format;
 use axum::extract::multipart::MultipartError;
 use axum::http::StatusCode;
 use axum::http::header::{InvalidHeaderValue, ToStrError};
@@ -29,6 +30,9 @@ pub enum TapferError {
 
     #[error("The requested token {0} does not have a matching UUID/upload")]
     TokenDoesNotExist(u32),
+    
+    #[error("Invalid expiration {0}")]
+    InvalidExpiration(String),
 
     #[error(transparent)]
     StdIo(#[from] io::Error),
@@ -59,6 +63,9 @@ pub enum TapferError {
 
     #[error(transparent)]
     QRCodeError(#[from] QRCodeError),
+    
+    #[error(transparent)]
+    TimeFormat(#[from] Format),
 }
 
 impl IntoResponse for TapferError {
@@ -69,23 +76,26 @@ impl IntoResponse for TapferError {
             Html(format!("Internal Server Error. This is a bug. Report it at https://github.com/FlareFlo/tapfer/issues Hint: {hint}")),
         ).into_response()
         };
+        use TapferError::*;
         match self {
-            TapferError::BadMultipartOrder => generic("multipart order"),
-            TapferError::UnknownMultipartField { .. } => generic("unknown multipart field"),
-            TapferError::MultipartFieldNameMissing => generic("multipart field name missing"),
-            TapferError::Custom { status_code, body } => (status_code, body).into_response(),
-            TapferError::StdIo(_) => generic("std_io"),
-            TapferError::Askama(_) => generic("askama"),
-            TapferError::Uuid(_) => generic("uuid"),
-            TapferError::TomlDeserialize(_) => generic("toml deserialization"),
-            TapferError::TomlSerialize(_) => generic("toml serialization"),
-            TapferError::InvalidHeader(_) => generic("invalid header"),
-            TapferError::AxumMultipart(_) => generic("axum multipart"),
-            TapferError::ParseIntError(_) => generic("parse int error"),
-            TapferError::ToStrError(_) => generic("to str error"),
-            TapferError::AddSizeToAlreadyKnown => generic("add size to already known"),
-            TapferError::TokenDoesNotExist(_) => generic("token does not exist"),
-            TapferError::QRCodeError(_) => generic("qr code generation"),
+            BadMultipartOrder => generic("multipart order"),
+            UnknownMultipartField { .. } => generic("unknown multipart field"),
+            MultipartFieldNameMissing => generic("multipart field name missing"),
+            Custom { status_code, body } => (status_code, body).into_response(),
+            StdIo(_) => generic("std_io"),
+            Askama(_) => generic("askama"),
+            Uuid(_) => generic("uuid"),
+            TomlDeserialize(_) => generic("toml deserialization"),
+            TomlSerialize(_) => generic("toml serialization"),
+            InvalidHeader(_) => generic("invalid header"),
+            AxumMultipart(_) => generic("axum multipart"),
+            ParseIntError(_) => generic("parse int error"),
+            ToStrError(_) => generic("to str error"),
+            AddSizeToAlreadyKnown => generic("add size to already known"),
+            TokenDoesNotExist(_) => generic("token does not exist"),
+            QRCodeError(_) => generic("qr code generation"),
+            InvalidExpiration(s) => generic(&format!("invalid expiration: {s}")),
+            TimeFormat(_) => generic("time format"),
         }
     }
 }

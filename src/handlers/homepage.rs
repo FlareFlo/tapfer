@@ -1,6 +1,6 @@
+use crate::configuration::{EMBED_DESCRIPTION, QR_CODE_SIZE};
 use askama::Template;
 use axum::response::{Html, IntoResponse};
-use crate::configuration::{EMBED_DESCRIPTION, QR_CODE_SIZE};
 
 #[derive(Template)]
 #[template(path = "homepage.html")]
@@ -11,5 +11,13 @@ pub struct Homepage {
 }
 
 pub async fn show_form() -> impl IntoResponse {
-    Html(Homepage{ embed_image_url: "/graphics/favicon.ico", embed_description: EMBED_DESCRIPTION, qr_size: QR_CODE_SIZE }.render().unwrap())
+    Html(
+        Homepage {
+            embed_image_url: "/graphics/favicon.ico",
+            embed_description: EMBED_DESCRIPTION,
+            qr_size: QR_CODE_SIZE,
+        }
+        .render()
+        .unwrap(),
+    )
 }

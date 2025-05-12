@@ -1,13 +1,12 @@
-use std::thread::sleep;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, UPLOAD_BUFSIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
 use axum::extract::multipart::Field;
-use axum::extract::{Multipart, Path};
+use axum::extract::{Multipart, Path, Request};
 use axum::http::header::CONTENT_LENGTH;
-use axum::http::{HeaderName, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
 use dashmap::DashMap;
 use futures_util::TryStreamExt;
@@ -17,24 +16,28 @@ use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
+use std::thread::sleep;
 use std::time::{Duration as StdDuration, Duration};
 use time::Duration as TimeDuration;
 use tokio::fs::File;
-use tokio::io::{AsyncWrite, AsyncWriteExt, BufReader, copy_buf, BufWriter, AsyncRead};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, BufWriter, copy_buf};
 use tokio::task::block_in_place;
 use tokio::{fs, task};
 use tokio_util::io::{ReaderStream, StreamReader};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(|| DashMap::new());
 
-pub async fn accept_form(multipart: Multipart) -> TapferResult<impl IntoResponse> {
+pub async fn accept_form(
+    headers: HeaderMap,
+    multipart: Multipart,
+) -> TapferResult<impl IntoResponse> {
     let uuid = Uuid::new_v4();
     fs::create_dir(&format!("data/{uuid}")).await?;
 
     info!("Beginning upload of {uuid}");
-    let res = do_upload(multipart, uuid).await;
+    let res = do_upload(&headers, multipart, uuid).await;
     if res.is_err() {
         delete_asset(uuid).await?;
     }
@@ -44,18 +47,32 @@ pub async fn accept_form(multipart: Multipart) -> TapferResult<impl IntoResponse
     Ok(Redirect::to(&format!("/uploads/{}", uuid)))
 }
 
-async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl IntoResponse> {
+async fn do_upload(
+    headers: &HeaderMap,
+    mut multipart: Multipart,
+    uuid: Uuid,
+) -> TapferResult<impl IntoResponse> {
     let mut meta = FileMetaBuilder::default();
-    let mut got_file = false;
-    let ensure_file_last = |got_file| {
-        if got_file {
-            Err(TapferError::BadMultipartOrder)
-        } else {
-            Ok(())
-        }
-    };
-    let mut size: Option<u64> = None;
-    let mut in_progress_token: Option<u32> = None;
+
+    let size: Option<u64> = headers
+        .get("tapfer_file_size")
+        .map(|h| h.to_str())
+        .transpose()?
+        .map(|h| h.parse::<u64>())
+        .transpose()?;
+    let in_progress_token: Option<u32> = headers
+        .get("tapfer_progress_token")
+        .map(|h| h.to_str())
+        .transpose()?
+        .map(|h| h.parse())
+        .transpose()?;
+
+    expiration_field(headers.get("tapfer_expiration"), &mut meta).await?;
+
+    info!("Adding progress token {in_progress_token:?}");
+    PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
+    
+    
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
@@ -70,21 +87,9 @@ async fn do_upload(mut multipart: Multipart, uuid: Uuid) -> TapferResult<impl In
                     );
                 }
                 payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;
-                got_file = true;
-            }
-            "expiration" => {
-                expiration_field(field, &mut meta).await?;
-                ensure_file_last(got_file)?;
-            }
-            "file_size" => {
-                size = Some(field.text().await?.parse()?);
-            }
-            "in_progress_token" => {
-                in_progress_token = Some(field.text().await?.parse()?);
-                info!("Adding progress token {in_progress_token:?}");
-                PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
             }
             _ => {
+                error!("Got unexpected form field {name}");
                 Err(TapferError::UnknownMultipartField {
                     field_name: name.to_owned(),
                 })?;
@@ -115,9 +120,10 @@ async fn payload_field(
     let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
     let f = File::create(format!("data/{uuid}/{file_name}")).await?;
     let mut f = WriterProgress::new(f, handle.clone(), metadata, size.is_none());
-    let mut s = BufReader::with_capacity(UPLOAD_BUFSIZE, StreamReader::new(
-        field.map_err(|e| TapferError::AxumMultipart(e)),
-    ));
+    let mut s = BufReader::with_capacity(
+        UPLOAD_BUFSIZE,
+        StreamReader::new(field.map_err(|e| TapferError::AxumMultipart(e))),
+    );
     copy_buf(&mut s, &mut f).await?;
     let metadata = f.disassemble();
     fs::write(
@@ -130,16 +136,22 @@ async fn payload_field(
     Ok(())
 }
 
-async fn expiration_field(field: Field<'_>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
-    let text = field.text().await?;
-    match text.as_str() {
+async fn expiration_field(field: Option<&HeaderValue>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
+    let f = if let Some(f) = field {
+        f.to_str()?
+    } else { 
+        return Ok(());
+    };
+    match f {
         "single_download" => meta.expiration = Some(RemovalPolicy::SingleDownload),
         "24_hours" => {
             meta.expiration = Some(RemovalPolicy::Expiry {
                 after: TimeDuration::hours(24),
             })
         }
-        _ => {}
+        _ => {
+            Err(TapferError::InvalidExpiration(f.to_owned()))?;
+        }
     }
     Ok(())
 }
@@ -160,7 +172,12 @@ pub struct WriterProgress<S> {
 }
 
 impl<S> WriterProgress<S> {
-    pub fn new(file: S, upload_handle: UploadHandle, metadata: FileMeta, write_to_meta: bool) -> Self {
+    pub fn new(
+        file: S,
+        upload_handle: UploadHandle,
+        metadata: FileMeta,
+        write_to_meta: bool,
+    ) -> Self {
         Self {
             file,
             upload_handle,
@@ -168,7 +185,7 @@ impl<S> WriterProgress<S> {
             write_to_meta,
         }
     }
-    
+
     pub fn disassemble(self) -> FileMeta {
         self.metadata
     }
@@ -184,11 +201,13 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
         let pollres = pinned.as_mut().poll_write(cx, buf);
         match pollres {
             Poll::Ready(Ok(n)) => {
-                if self.write_to_meta {  
-                    self.metadata.add_size(n as u64).expect("since write_to_meta is set this should not panic");
+                if self.write_to_meta {
+                    self.metadata
+                        .add_size(n as u64)
+                        .expect("since write_to_meta is set this should not panic");
                 }
                 let handle = self.upload_handle.clone();
-                task::spawn(async move {handle.add_progress(n).await});
+                task::spawn(async move { handle.add_progress(n).await });
             }
             _ => {}
         }

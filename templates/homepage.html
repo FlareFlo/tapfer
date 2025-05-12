@@ -50,7 +50,7 @@
 	<div class="form-box" id="uploadBox">
 		<div class="container">
 			<form id="uploadForm">
-				<select name="expiration">
+				<select name="expiration" id="expiration">
 					<option value="single_download" selected="selected">Delete after one download</option>
 					<option value="24_hours">Delete after 24 hours</option>
 				</select>
@@ -75,9 +75,13 @@
 </section>
 
 <script>
+	// All id elements
     const copylink = document.getElementById("copylink");
     const downloadURL = document.getElementById("downloadURL");
     const progresstext = document.getElementById("progresstext");
+    const background = document.getElementById('uploadBox');
+    const percentageElement = document.getElementById('blurred-percentage');
+
     copylink.addEventListener("click", () => {
         if (copylink.href === "") {
             navigator.clipboard.writeText(downloadURL.href);
@@ -86,25 +90,31 @@
 	});
 
     document.getElementById('uploadForm').addEventListener('submit', function (e) {
+        // We handle the entire request ourselves
         e.preventDefault();
 
+        // Generate any random 32 bit integer
         const array = new Uint32Array(1);
         window.crypto.getRandomValues(array);
         const random_seed =  array[0];
 
         const form = e.target;
         const formData = new FormData(form);
+
+        // Prepare our POST
         const main_xhr = new XMLHttpRequest();
+        main_xhr.open('POST', '/', true);
+
+        // Set all form fields as headers
         const fileInput = form.querySelector('input[name="file"]');
         const file = fileInput.files[0];
-        formData.set("file_size", file.size);
-        formData.set("in_progress_token", random_seed.toString());
-
-        const background = document.getElementById('uploadBox');
-        const percentageElement = document.getElementById('blurred-percentage');
+        main_xhr.setRequestHeader("tapfer_file_size", file.size);
+        main_xhr.setRequestHeader("tapfer_progress_token", random_seed.toString());
+        main_xhr.setRequestHeader("tapfer_expiration", formData.get("expiration"));
 
         background.style.backgroundSize = '0% 100%';
 
+        // Tracks upload speed
         let last_progress = Date.now();
         let last_loaded = 0;
 
@@ -120,7 +130,6 @@
 
                 const now = Date.now();
                 const elapsed = (now - last_progress) / 1000;// seconds not millis
-				console.log(elapsed);
                 const bytes_since_last = e.loaded - last_loaded;
                 const speedBps = bytes_since_last / (elapsed || 1); // bytes per second (avoid divide by zero)
 
@@ -138,6 +147,7 @@
         });
 
         let fired = false;
+        let sent = Date.now();
 
         main_xhr.upload.addEventListener('progress', function (e) {
             if (fired) {return;}
@@ -145,7 +155,8 @@
 			// This is both:
 			// a hack ensuring the backend registered the uuid token and;
 			// a measure to protect the backend from getting a request with tiny payloads that complete instantly
-            if (e.loaded < 1024 * 1024) {return;};
+			// Only fire token request when one second of upload has passed
+            if ((Date.now - sent) < 1000) {return;};
 
             const token_xhr = new XMLHttpRequest();
             token_xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
@@ -178,7 +189,11 @@
             }
         };
 
-        main_xhr.open('POST', '/', true);
+        // Unset all form fields, as only file will be needed. The rest is in the headers
+        formData.delete("file_size");
+        formData.delete("expiration");
+        formData.delete("file_size");
+        formData.delete("in_progress_token");
         main_xhr.send(formData);
     });
 </script>

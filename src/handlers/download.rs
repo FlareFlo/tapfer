@@ -1,3 +1,4 @@
+use time::macros::format_description;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
@@ -18,6 +19,7 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use time::format_description::BorrowedFormatItem;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::BufReader;
@@ -45,10 +47,11 @@ struct DownloadTemplate<'a> {
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, meta), progress_handle) = get_any_meta(&path).await?;
 
+    static DES: &[BorrowedFormatItem<'_>] = format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
         RemovalPolicy::Expiry { .. } => {
-            format!(" on {}", meta.expires_on().unwrap())
+            format!("{}", meta.expires_on().unwrap().format(&DES)?)
         }
     };
 
@@ -133,7 +136,13 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
     let stream = ReaderStream::with_capacity(file, DOWNLOAD_CHUNKSIZE);
-    let wrapped = DownloadStream::new(stream, uuid, meta, handle, UPLOAD_POOL.uploads.contains_key(&uuid));
+    let wrapped = DownloadStream::new(
+        stream,
+        uuid,
+        meta,
+        handle,
+        UPLOAD_POOL.uploads.contains_key(&uuid),
+    );
     Ok((headers, Body::from_stream(wrapped)))
 }
 
@@ -174,7 +183,7 @@ impl Drop for DownloadStream {
         }
         let meta = self.meta.clone();
         let uuid = self.uuid;
-        
+
         tokio::spawn(async move {
             if meta.remove_after_download() {
                 info!("Removing {uuid} as its download has completed");

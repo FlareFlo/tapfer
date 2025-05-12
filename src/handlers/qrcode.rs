@@ -1,3 +1,4 @@
+use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
 use crate::error::TapferResult;
 use axum::body::Body;
 use axum::extract::Path;
@@ -7,18 +8,14 @@ use qrcode_generator::QrCodeEcc;
 use std::env;
 use std::str::FromStr;
 use uuid::Uuid;
-use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
 
-pub async fn get_qrcode_from_uuid(
-    Path(path): Path<String>,
-) -> TapferResult<impl IntoResponse> {
+pub async fn get_qrcode_from_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let uuid = Uuid::parse_str(&path)?;
     let qrc = qr_from_uuid(uuid)?;
     Ok(Body::from(qrc))
 }
 
-pub async fn get_placeholder_qrcode(
-) -> TapferResult<impl IntoResponse> {
+pub async fn get_placeholder_qrcode() -> TapferResult<impl IntoResponse> {
     // Just any funny looking UUID, it doesn't really matter
     let qrc = qr_from_uuid(Uuid::new_v4())?;
     Ok(Body::from(qrc))

@@ -47,9 +47,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
-        RemovalPolicy::Expiry { .. } => {
-            meta.expires_on().unwrap().format(&DES)?.to_string()
-        }
+        RemovalPolicy::Expiry { .. } => meta.expires_on().unwrap().format(&DES)?.to_string(),
     };
 
     let template = DownloadTemplate {
@@ -60,9 +58,9 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)
         } else if progress_handle.is_some() {
-                "upload in progress"
-            } else {
-                &human_bytes(meta.size() as f64)
+            "upload in progress"
+        } else {
+            &human_bytes(meta.size() as f64)
         },
         uuid,
         embed_image_url: &format!("/qrcg/{uuid}"),
@@ -74,8 +72,8 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
 }
 
 async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<UploadHandle>)> {
-    // Path traversal is might be possible here, check if try_exists with a malicious path causes issues
-    let res = match fs::try_exists(&format!("data/{path}/meta.toml")).await.ok() {
+    let uuid = Uuid::from_str(&path)?;
+    let res = match fs::try_exists(&format!("data/{uuid}/meta.toml")).await.ok() {
         // Regular download
         Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),
         // In-progress upload or doesnt exist

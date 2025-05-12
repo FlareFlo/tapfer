@@ -117,7 +117,7 @@ async fn payload_field(
     let mut f = WriterProgress::new(f, handle.clone(), metadata, size.is_none());
     let mut s = BufReader::with_capacity(
         UPLOAD_BUFSIZE,
-        StreamReader::new(field.map_err( TapferError::AxumMultipart)),
+        StreamReader::new(field.map_err(TapferError::AxumMultipart)),
     );
     copy_buf(&mut s, &mut f).await?;
     let metadata = f.disassemble();

@@ -1,4 +1,4 @@
-use crate::configuration::{DOWNLOAD_CHUNKSIZE, QR_CODE_SIZE};
+use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers;
@@ -39,6 +39,7 @@ struct DownloadTemplate<'a> {
     uuid: Uuid,
     embed_image_url: &'a str,
     qr_size: usize,
+    embed_description: &'a str,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
@@ -69,6 +70,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         uuid,
         embed_image_url: &format!("/qrcg/{uuid}"),
         qr_size: QR_CODE_SIZE,
+        embed_description: &format!("{EMBED_DESCRIPTION}"),
     };
 
     Ok(Html(template.render()?))

@@ -37,6 +37,7 @@ struct DownloadTemplate<'a> {
     mimetype: &'a str,
     filesize: &'a str,
     uuid: Uuid,
+    embed_image_url: &'a str,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
@@ -65,6 +66,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
             }
         },
         uuid,
+        embed_image_url: &format!("/qrcg/{uuid}"),
     };
 
     Ok(Html(template.render()?))
@@ -83,7 +85,7 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
                 None => {
                     return Err(TapferError::Custom {
                         status_code: StatusCode::NOT_FOUND,
-                        body: Html(NotFound.render()?),
+                        body: Html(NotFound::default().render()?),
                     });
                 }
                 // The upload is in-progress

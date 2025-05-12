@@ -1,4 +1,3 @@
-use time::macros::format_description;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
@@ -20,6 +19,7 @@ use std::str::FromStr;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use time::format_description::BorrowedFormatItem;
+use time::macros::format_description;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::BufReader;
@@ -47,7 +47,8 @@ struct DownloadTemplate<'a> {
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, meta), progress_handle) = get_any_meta(&path).await?;
 
-    static DES: &[BorrowedFormatItem<'_>] = format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
+    static DES: &[BorrowedFormatItem<'_>] =
+        format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
         RemovalPolicy::Expiry { .. } => {

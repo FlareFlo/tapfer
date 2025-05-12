@@ -67,12 +67,17 @@ async fn do_upload(
         .map(|h| h.parse())
         .transpose()?;
 
+    if size.is_some() != in_progress_token.is_some() {
+        warn!(
+            "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?\n Headers: {headers:?}"
+        );
+    }
+
     expiration_field(headers.get("tapfer_expiration"), &mut meta).await?;
 
     info!("Adding progress token {in_progress_token:?}");
     PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
-    
-    
+
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
@@ -81,11 +86,6 @@ async fn do_upload(
         debug!("reading field {name}");
         match name.as_str() {
             "file" => {
-                if size.is_some() != in_progress_token.is_some() {
-                    warn!(
-                        "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?"
-                    );
-                }
                 payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;
             }
             _ => {
@@ -136,10 +136,13 @@ async fn payload_field(
     Ok(())
 }
 
-async fn expiration_field(field: Option<&HeaderValue>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
+async fn expiration_field(
+    field: Option<&HeaderValue>,
+    meta: &mut FileMetaBuilder,
+) -> TapferResult<()> {
     let f = if let Some(f) = field {
         f.to_str()?
-    } else { 
+    } else {
         return Ok(());
     };
     match f {

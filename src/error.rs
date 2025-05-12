@@ -1,4 +1,3 @@
-use time::error::Format;
 use axum::extract::multipart::MultipartError;
 use axum::http::StatusCode;
 use axum::http::header::{InvalidHeaderValue, ToStrError};
@@ -6,6 +5,7 @@ use axum::response::{Html, IntoResponse, Response};
 use qrcode_generator::QRCodeError;
 use std::io;
 use std::num::ParseIntError;
+use time::error::Format;
 
 pub type TapferResult<T> = Result<T, TapferError>;
 #[derive(thiserror::Error, Debug)]
@@ -30,7 +30,7 @@ pub enum TapferError {
 
     #[error("The requested token {0} does not have a matching UUID/upload")]
     TokenDoesNotExist(u32),
-    
+
     #[error("Invalid expiration {0}")]
     InvalidExpiration(String),
 
@@ -63,7 +63,7 @@ pub enum TapferError {
 
     #[error(transparent)]
     QRCodeError(#[from] QRCodeError),
-    
+
     #[error(transparent)]
     TimeFormat(#[from] Format),
 }

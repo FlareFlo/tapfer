@@ -48,7 +48,7 @@ impl FileSize {
     }
 }
 impl FileMeta {
-    pub fn default_policy(name: String, mimetype: String, known_size: Option<u64>) -> Self {
+    pub fn _default_policy(name: String, mimetype: String, known_size: Option<u64>) -> Self {
         FileMetaBuilder::default().build(name, mimetype, known_size)
     }
 
@@ -111,7 +111,6 @@ impl FileMeta {
 #[derive(Debug, Clone, Default)]
 pub struct FileMetaBuilder {
     pub expiration: Option<RemovalPolicy>,
-    pub in_progress_token: Option<u32>,
 }
 
 impl FileMetaBuilder {

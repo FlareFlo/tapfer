@@ -1,13 +1,12 @@
-use crate::configuration::{DOWNLOAD_CHUNKSIZE, UPLOAD_BUFSIZE};
+use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
 use axum::extract::multipart::Field;
-use axum::extract::{Multipart, Path, Request};
-use axum::http::header::CONTENT_LENGTH;
-use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
-use axum::response::{Html, IntoResponse, Redirect};
+use axum::extract::{Multipart, Path};
+use axum::http::{HeaderMap, HeaderValue};
+use axum::response::{IntoResponse, Redirect};
 use dashmap::DashMap;
 use futures_util::TryStreamExt;
 use scopeguard::defer;
@@ -16,14 +15,11 @@ use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
-use std::thread::sleep;
-use std::time::{Duration as StdDuration, Duration};
 use time::Duration as TimeDuration;
 use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, BufWriter, copy_buf};
-use tokio::task::block_in_place;
+use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
-use tokio_util::io::{ReaderStream, StreamReader};
+use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -77,6 +73,12 @@ async fn do_upload(
 
     info!("Adding progress token {in_progress_token:?}");
     PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
+    defer! {
+        if let Some(t) = in_progress_token {
+            info!("deleting progress token {t}");
+            PROGRESS_TOKEN_LUT.remove(&t);
+        }
+    }
 
     while let Some(field) = multipart.next_field().await? {
         let name = field
@@ -86,7 +88,7 @@ async fn do_upload(
         debug!("reading field {name}");
         match name.as_str() {
             "file" => {
-                payload_field(field, uuid, meta.clone(), size, in_progress_token).await?;
+                payload_field(field, uuid, meta.clone(), size).await?;
             }
             _ => {
                 error!("Got unexpected form field {name}");
@@ -96,26 +98,19 @@ async fn do_upload(
             }
         }
     }
-    defer! {
-        if let Some(t) = in_progress_token {
-            info!("deleting progress token {t}");
-            PROGRESS_TOKEN_LUT.remove(&t);
-        }
-    }
     Ok(())
 }
 
 async fn payload_field(
-    mut field: Field<'_>,
+    field: Field<'_>,
     uuid: Uuid,
     metadata_builder: FileMetaBuilder,
     size: Option<u64>,
-    in_progress_token: Option<u32>,
 ) -> TapferResult<()> {
     let file_name = field.file_name().unwrap().to_string();
     let content_type = field.content_type().unwrap().to_string();
 
-    let mut metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
+    let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client
     let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
     let f = File::create(format!("data/{uuid}/{file_name}")).await?;

@@ -2,11 +2,8 @@ use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
 use crate::error::TapferResult;
 use axum::body::Body;
 use axum::extract::Path;
-use axum::http;
 use axum::response::IntoResponse;
-use qrcode_generator::QrCodeEcc;
 use std::env;
-use std::str::FromStr;
 use uuid::Uuid;
 
 pub async fn get_qrcode_from_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {

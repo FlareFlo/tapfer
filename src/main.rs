@@ -6,10 +6,9 @@ mod retention_control;
 mod upload_pool;
 
 use crate::configuration::MAX_UPLOAD_SIZE;
-use crate::error::{TapferError, TapferResult};
+use crate::error::TapferResult;
 use crate::handlers::upload;
 use crate::retention_control::{GLOBAL_RETENTION_POLICY, check_all_assets};
-use axum::response::IntoResponse;
 use axum::routing::get_service;
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use handlers::homepage;

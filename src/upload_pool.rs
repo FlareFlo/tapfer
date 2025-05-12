@@ -57,7 +57,7 @@ impl UploadHandle {
         self.handle.write().await.progress += progress;
     }
 
-    pub async fn get_progress(&self) -> usize {
+    pub async fn _get_progress(&self) -> usize {
         self.handle.read().await.progress
     }
 
@@ -70,7 +70,7 @@ impl UploadHandle {
         self.handle.write().await.complete = true;
     }
 
-    pub async fn is_complete(&self) -> bool {
+    pub async fn _is_complete(&self) -> bool {
         self.handle.read().await.complete
     }
 

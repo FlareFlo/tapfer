@@ -1,7 +1,6 @@
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
-use crate::handlers;
 use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
 use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
@@ -10,7 +9,6 @@ use axum::body::Body;
 use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse};
-use dashmap::mapref::one::Ref;
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
 use std::io;
@@ -22,7 +20,6 @@ use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
 use tokio::fs;
 use tokio::fs::File;
-use tokio::io::BufReader;
 use tokio::time::sleep;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
@@ -33,7 +30,6 @@ use uuid::Uuid;
 #[template(path = "download.html")]
 struct DownloadTemplate<'a> {
     filename: &'a str,
-    unix_time: i64,
     expiry: &'a str,
     download_url: &'a str,
     mimetype: &'a str,
@@ -58,7 +54,6 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
 
     let template = DownloadTemplate {
         filename: meta.name(),
-        unix_time: meta.created().unix_timestamp(),
         expiry: &expiry,
         download_url: &format!("/uploads/{uuid}/download"),
         mimetype: meta.content_type(),
@@ -108,7 +103,7 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
 }
 
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, mut meta), handle) = get_any_meta(&path).await?;
+    let ((uuid, meta), handle) = get_any_meta(&path).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(

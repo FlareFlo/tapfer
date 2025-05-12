@@ -16,7 +16,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.16.0", features = ["v4"] }
 futures-core = "0.3.31"
-askama = "0.13.0"
+askama = "0.14.0"
 tokio-util = { version = "0.7.14", features = ["io"] }
 futures-util = "0.3.31"
 human_bytes = "0.4.3"

@@ -28,6 +28,6 @@ pub const UPLOAD_BUFSIZE: usize = size!(100 M);
 pub const QR_CODE_SIZE: usize = 200; // pixels
 pub const QR_CODE_ECC: QrCodeEcc = QrCodeEcc::Medium;
 
-pub const EMBED_DESCRIPTION: &'static str = "making file transfers trivial";
+pub const EMBED_DESCRIPTION: &str = "making file transfers trivial";
 
-pub const FAVICON: &'static str = "/static/favicon.ico";
+pub const FAVICON: &str = "/static/favicon.ico";

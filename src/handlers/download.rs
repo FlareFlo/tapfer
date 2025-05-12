@@ -48,7 +48,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
         RemovalPolicy::Expiry { .. } => {
-            format!("{}", meta.expires_on().unwrap().format(&DES)?)
+            meta.expires_on().unwrap().format(&DES)?.to_string()
         }
     };
 
@@ -57,19 +57,17 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         expiry: &expiry,
         download_url: &format!("/uploads/{uuid}/download"),
         mimetype: meta.content_type(),
-        filesize: if let Some(_) = meta.known_size() {
+        filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)
-        } else {
-            if progress_handle.is_some() {
+        } else if progress_handle.is_some() {
                 "upload in progress"
             } else {
                 &human_bytes(meta.size() as f64)
-            }
         },
         uuid,
         embed_image_url: &format!("/qrcg/{uuid}"),
         qr_size: QR_CODE_SIZE,
-        embed_description: &format!("{EMBED_DESCRIPTION}"),
+        embed_description: EMBED_DESCRIPTION,
     };
 
     Ok(Html(template.render()?))
@@ -82,7 +80,7 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
         Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),
         // In-progress upload or doesnt exist
         _ => {
-            let uuid = Uuid::from_str(&path)?;
+            let uuid = Uuid::from_str(path)?;
             match UPLOAD_POOL.uploads.get(&uuid) {
                 // The upload is not in progress either, so it does not exist
                 None => {
@@ -212,11 +210,8 @@ impl futures_core::Stream for DownloadStream {
             }
         }
         let poll_res = self.inner.poll_next_unpin(cx);
-        match &poll_res {
-            Poll::Ready(Some(Ok(b))) => {
-                self.self_progress += b.len();
-            }
-            _ => {}
+        if let Poll::Ready(Some(Ok(b))) = &poll_res {
+            self.self_progress += b.len();
         }
         poll_res
     }

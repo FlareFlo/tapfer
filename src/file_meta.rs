@@ -53,10 +53,7 @@ impl FileMeta {
     }
 
     pub fn remove_after_download(&self) -> bool {
-        match self.removal_policy {
-            RemovalPolicy::SingleDownload => true,
-            _ => false,
-        }
+        matches!(self.removal_policy, RemovalPolicy::SingleDownload)
     }
 
     pub async fn read_from_uuid_path(path: impl AsRef<Path>) -> TapferResult<(Uuid, Self)> {

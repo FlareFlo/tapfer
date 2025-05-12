@@ -22,7 +22,7 @@ fn qr_from_uuid(uuid: Uuid) -> TapferResult<Vec<u8>> {
     let host = env::var("HOST").expect("Should ok as main checks this var already");
     let method = if host != "localhost" { "https://" } else { "" };
     let qrc = qrcode_generator::to_png_to_vec(
-        format!("{}{}/uploads/{uuid}", method, host,).as_bytes(),
+        format!("{method}{host}/uploads/{uuid}",).as_bytes(),
         QR_CODE_ECC,
         QR_CODE_SIZE,
     )?;

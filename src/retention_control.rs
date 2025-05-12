@@ -11,7 +11,7 @@ use tracing::info;
 use uuid::Uuid;
 
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
-    LazyLock::new(|| GlobalRetentionPolicy::default());
+    LazyLock::new(GlobalRetentionPolicy::default);
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,

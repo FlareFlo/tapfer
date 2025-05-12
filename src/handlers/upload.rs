@@ -23,7 +23,7 @@ use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(|| DashMap::new());
+pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(DashMap::new);
 
 pub async fn accept_form(
     headers: HeaderMap,
@@ -40,7 +40,7 @@ pub async fn accept_form(
     res?;
     info!("Completed upload of {uuid}");
 
-    Ok(Redirect::to(&format!("/uploads/{}", uuid)))
+    Ok(Redirect::to(&format!("/uploads/{uuid}")))
 }
 
 async fn do_upload(
@@ -117,7 +117,7 @@ async fn payload_field(
     let mut f = WriterProgress::new(f, handle.clone(), metadata, size.is_none());
     let mut s = BufReader::with_capacity(
         UPLOAD_BUFSIZE,
-        StreamReader::new(field.map_err(|e| TapferError::AxumMultipart(e))),
+        StreamReader::new(field.map_err( TapferError::AxumMultipart)),
     );
     copy_buf(&mut s, &mut f).await?;
     let metadata = f.disassemble();
@@ -197,17 +197,14 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
     ) -> Poll<Result<usize, Error>> {
         let mut pinned = pin!(&mut self.file);
         let pollres = pinned.as_mut().poll_write(cx, buf);
-        match pollres {
-            Poll::Ready(Ok(n)) => {
-                if self.write_to_meta {
-                    self.metadata
-                        .add_size(n as u64)
-                        .expect("since write_to_meta is set this should not panic");
-                }
-                let handle = self.upload_handle.clone();
-                task::spawn(async move { handle.add_progress(n).await });
+        if let Poll::Ready(Ok(n)) = pollres {
+            if self.write_to_meta {
+                self.metadata
+                    .add_size(n as u64)
+                    .expect("since write_to_meta is set this should not panic");
             }
-            _ => {}
+            let handle = self.upload_handle.clone();
+            task::spawn(async move { handle.add_progress(n).await });
         }
         pollres
     }

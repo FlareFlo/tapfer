@@ -6,7 +6,7 @@ use tokio::task::block_in_place;
 use tracing::error;
 use uuid::Uuid;
 
-pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(|| UploadPool::new());
+pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 
 /// A pool of currently running uploads
 #[derive(Debug)]

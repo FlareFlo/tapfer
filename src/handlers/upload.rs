@@ -67,7 +67,7 @@ async fn do_upload(
         .map(|h| h.parse())
         .transpose()?;
 
-    if size.is_some() != in_progress_token.is_some() {
+    if size.is_some() != in_progress_token.is_some()  || true {
         warn!(
             "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?\n Headers: {headers:?}"
         );

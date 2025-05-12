@@ -46,7 +46,7 @@ async fn main() -> TapferResult<()> {
 
     init_datadir();
 
-    let graphics_dir_service = get_service(ServeDir::new("graphics"));
+    let static_dir_service = get_service(ServeDir::new("static"));
 
     // build our application with some routes
     let app = Router::new()
@@ -68,7 +68,7 @@ async fn main() -> TapferResult<()> {
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())
-        .nest_service("/graphics", graphics_dir_service);
+        .nest_service("/static", static_dir_service);
 
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;

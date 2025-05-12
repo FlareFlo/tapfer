@@ -11,6 +11,6 @@ RUN cargo build --release
 FROM docker.io/archlinux
 WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/target/release/tapfer .
-COPY ./graphics ./graphics
+COPY ./static ./static
 
 CMD ["./tapfer"]

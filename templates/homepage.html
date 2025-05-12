@@ -103,7 +103,6 @@
 
         // Prepare our POST
         const main_xhr = new XMLHttpRequest();
-        main_xhr.open('POST', '/', true);
 
         // Set all form fields as headers
         const fileInput = form.querySelector('input[name="file"]');
@@ -111,6 +110,7 @@
         main_xhr.setRequestHeader("tapfer_file_size", file.size);
         main_xhr.setRequestHeader("tapfer_progress_token", random_seed.toString());
         main_xhr.setRequestHeader("tapfer_expiration", formData.get("expiration"));
+        main_xhr.open('POST', '/', true);
 
         background.style.backgroundSize = '0% 100%';
 

@@ -30,7 +30,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 15em; /* Adjust this to fine-tune fit */
+            font-size: 14rem; /* Adjust this to fine-tune fit */
             color: rgba(0, 0, 0, 0.1);
             user-select: none;
             pointer-events: none;
@@ -50,18 +50,18 @@
 	<div class="form-box" id="uploadBox">
 		<div class="container">
 			<form id="uploadForm">
+				<label for="expiration">Remove after </label>
 				<select name="expiration" id="expiration">
-					<option value="single_download" selected="selected">Delete after one download</option>
-					<option value="24_hours">Delete after 24 hours</option>
+					<option value="single_download" selected="selected">one download</option>
+					<option value="24_hours">24 hours</option>
 				</select>
-				<input type="hidden" name="file_size", value="0">
-				<input type="hidden" name="in_progress_token", value="">
+				<br>
 
 				<label>
-					Choose file to upload:
-					<input type="file" name="file" required>
+					Select or drop file
+					<input id="file_input" type="file" name="file" required>
 				</label>
-				<input type="submit" value="Upload files">
+<!--				<input type="submit" value="Upload files">-->
 			</form>
 
 			<div>
@@ -69,7 +69,7 @@
 				<a id="downloadURL" href="" target="_blank">Download URL</a>
 				<button id="copylink">Copy to clipboard</button>
 			</div>
-			<img rel="preload" id="qrcode" src="/qrcg/placeholder.png" width="{{qr_size}}px", height="{{qr_size}}px" alt="placeholder qrcode">
+			<img rel="preload" id="qrcode" src="/qrcg/placeholder.png" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 		</div>
 	</div>
 </section>
@@ -81,6 +81,8 @@
     const progresstext = document.getElementById("progresstext");
     const background = document.getElementById('uploadBox');
     const percentageElement = document.getElementById('blurred-percentage');
+    const form = document.getElementById('uploadForm');
+    const fileinput = document.getElementById("file_input");
 
     copylink.addEventListener("click", () => {
         if (copylink.href === "") {
@@ -89,7 +91,25 @@
 		}
 	});
 
-    document.getElementById('uploadForm').addEventListener('submit', function (e) {
+    // Prevent default actions
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        document.body.addEventListener(eventName, (e) => e.preventDefault(), false);
+    });
+
+    document.body.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(e.dataTransfer.files[0]);
+        fileinput.files = dataTransfer.files;
+        form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+	})
+
+	fileinput.addEventListener("change", (e) => {
+        e.preventDefault();
+        form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    })
+
+    form.addEventListener('submit', function (e) {
         // We handle the entire request ourselves
         e.preventDefault();
 
@@ -190,10 +210,7 @@
         };
 
         // Unset all form fields, as only file will be needed. The rest is in the headers
-        formData.delete("file_size");
         formData.delete("expiration");
-        formData.delete("file_size");
-        formData.delete("in_progress_token");
         main_xhr.send(formData);
     });
 </script>

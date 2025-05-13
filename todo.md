@@ -1,4 +1,3 @@
-- Use waker channel for new data instead of timer in updown impl
 - fail download when upstream closes prematurely
 - delete endpoint and button on asset
 - ensure single downloads are still expired after a few days

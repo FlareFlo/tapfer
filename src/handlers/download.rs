@@ -18,12 +18,12 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
-use tokio::fs;
 use tokio::fs::File;
 use tokio::time::sleep;
+use tokio::{fs, select};
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 #[derive(Template)]
@@ -200,13 +200,28 @@ impl futures_core::Stream for DownloadStream {
                 && (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress
             {
                 let waker = cx.waker().clone();
-                tokio::spawn(async {
-                    sleep(Duration::from_millis(10)).await;
+                let handle = handle.clone();
+                tokio::spawn(async move {
+                    let timeout = sleep(Duration::from_millis(1000));
+                    let progress = handle.wait_for_progress();
+                    select! {
+                        _ = timeout => {
+                            if !handle.is_complete().await {
+                                warn!("Download task timed out. Is the sender too slow?");
+                            }
+                        }
+                        _ = progress => {
+                            // Do nothing, this is good
+                        }
+                    };
+                    // Wake either way
                     waker.wake();
                 });
                 return Poll::Pending;
             }
         }
+        
+        
         let poll_res = self.inner.poll_next_unpin(cx);
         if let Poll::Ready(Some(Ok(b))) = &poll_res {
             self.self_progress += b.len();

@@ -240,7 +240,10 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
                     .expect("since write_to_meta is set this should not panic");
             }
             let handle = self.upload_handle.clone();
-            task::spawn(async move { handle.add_progress(n).await });
+            task::spawn(async move {
+                handle.add_progress(n).await;
+                handle.notify_all_downloaders();
+            });
         }
         pollres
     }

@@ -1,7 +1,7 @@
 use crate::file_meta::FileMeta;
 use dashmap::DashMap;
 use std::sync::{Arc, LazyLock};
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 use tokio::task::block_in_place;
 use tracing::error;
 use uuid::Uuid;
@@ -20,6 +20,7 @@ pub struct UploadHandle {
     handle: Arc<RwLock<UploadProgress>>,
     uuid: Uuid,
     file_meta: FileMeta,
+    notify: Arc<Notify>,
 }
 
 /// The progress of an upload
@@ -45,6 +46,7 @@ impl UploadPool {
             })),
             uuid,
             file_meta,
+            notify: Arc::new(Notify::new()),
         };
         self.uploads.insert(uuid, handle.clone());
         handle
@@ -65,12 +67,22 @@ impl UploadHandle {
         block_in_place(|| self.handle.blocking_read().progress)
     }
 
+    /// Waits for uploader to add progress
+    pub async fn wait_for_progress(&self) {
+        self.notify.notified().await;
+    }
+
+    /// Notifies all downloaders about progress
+    pub fn notify_all_downloaders(&self) {
+        self.notify.notify_waiters();
+    }
+
     /// Marks upload complete
     pub async fn mark_complete(&self) {
         self.handle.write().await.complete = true;
     }
 
-    pub async fn _is_complete(&self) -> bool {
+    pub async fn is_complete(&self) -> bool {
         self.handle.read().await.complete
     }
 

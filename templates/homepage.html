@@ -40,7 +40,15 @@
 
 		#qrcode {
 			filter: blur(5px);
-			transition: filter 0.5s ease;
+		}
+
+		#filelink {
+			border-bottom-style: dot-dot-dash;
+			transition: color 0.5s ease;
+		}
+
+		#filelink:hover {
+			color: crimson;
 		}
 	</style>
 </head>
@@ -49,25 +57,31 @@
 	<div id="blurred-percentage"></div>
 	<div class="form-box" id="uploadBox">
 		<div class="container">
+			<div>
+				Drop file anywhere or <a id="filelink" href="javascript:document.getElementById('file_input').click();">select a file</a>
+			</div>
 			<form id="uploadForm">
-				<label for="expiration">Remove after </label>
-				<select name="expiration" id="expiration">
+				<label for="expiration" style="display: none">Remove after </label>
+				<select name="expiration" id="expiration" style="display: none">
 					<option value="single_download" selected="selected">one download</option>
 					<option value="24_hours">24 hours</option>
 				</select>
-				<br>
 
 				<label>
-					Select or drop file
-					<input id="file_input" type="file" name="file" required>
+					<input style="display: none" id="file_input" type="file" name="file" required>
 				</label>
-<!--				<input type="submit" value="Upload files">-->
+				<input style="display: none" type="submit" value="Upload files">
 			</form>
 
 			<div>
-				<div id="progresstext">0MB/0MB 0MB/s</div>
-				<a id="downloadURL" href="" target="_blank">Download URL</a>
-				<button id="copylink">Copy to clipboard</button>
+				Or use CURL <br>
+				<code>curl -X POST https://tapfer.lkl.lol -F file=@</code><code style="color: #00e2ff; !important;">path</code>
+			</div>
+
+			<div id="progress_text">0MB/0MB 0MB/s</div>
+			<div>
+				<a id="download_url" href="unset" target="_blank">Download URL</a>
+				<button id="copy_link_button">Copy to clipboard</button>
 			</div>
 			<img rel="preload" id="qrcode" src="/qrcg/placeholder.png" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 		</div>
@@ -76,9 +90,9 @@
 
 <script>
 	// All id elements
-    const copylink = document.getElementById("copylink");
-    const downloadURL = document.getElementById("downloadURL");
-    const progresstext = document.getElementById("progresstext");
+    const copylink = document.getElementById("copy_link_button");
+    const downloadURL = document.getElementById("download_url");
+    const progresstext = document.getElementById("progress_text");
     const background = document.getElementById('uploadBox');
     const percentageElement = document.getElementById('blurred-percentage');
     const form = document.getElementById('uploadForm');
@@ -96,6 +110,7 @@
         document.body.addEventListener(eventName, (e) => e.preventDefault(), false);
     });
 
+    // Dispatch upload when a file is dragged and dropped
     document.body.addEventListener("drop", (e) => {
         e.preventDefault();
         const dataTransfer = new DataTransfer();
@@ -104,10 +119,18 @@
         form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
 	})
 
+	// Dispatch upload once a file is selected
 	fileinput.addEventListener("change", (e) => {
         e.preventDefault();
         form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     })
+
+	// Prevent opening when it's not ready yet
+    downloadURL.addEventListener("click", (e) => {
+        if (downloadURL.href.endsWith("unset")) {
+            e.preventDefault();
+		}
+	})
 
     form.addEventListener('submit', function (e) {
         // We handle the entire request ourselves
@@ -131,6 +154,7 @@
         main_xhr.setRequestHeader("tapfer-file-size", file.size);
         main_xhr.setRequestHeader("tapfer-progress-token", random_seed.toString());
         main_xhr.setRequestHeader("tapfer-expiration", formData.get("expiration"));
+        main_xhr.setRequestHeader("tapfer-source", "frontend");
 
         background.style.backgroundSize = '0% 100%';
 
@@ -184,10 +208,9 @@
 
             token_xhr.onload = async function () {
                 if (token_xhr.status >= 200 && token_xhr.status < 300) {
-                    const urlelem = document.getElementById('downloadURL');
                     const url = `/uploads/${token_xhr.responseText}`;
-                    urlelem.href = url;
-                    urlelem.innerText = token_xhr.responseText;
+                    downloadURL.href = url;
+                    downloadURL.innerText = token_xhr.responseText;
 
                     qrcode.src = `/qrcg/${token_xhr.responseText}`;
                     qrcode.style.filter = 'none';

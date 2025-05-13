@@ -3,13 +3,15 @@ use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
+use axum::body::Body;
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path};
 use axum::http::{HeaderMap, HeaderValue};
-use axum::response::{IntoResponse, Redirect};
+use axum::response::{IntoResponse, Redirect, Response};
 use dashmap::DashMap;
 use futures_util::TryStreamExt;
 use scopeguard::defer;
+use std::env;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
@@ -23,8 +25,24 @@ use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+#[derive(Debug)]
+enum RequestSource {
+    Frontend(Redirect),
+    Unknown(Body),
+}
+
+impl IntoResponse for RequestSource {
+    fn into_response(self) -> Response {
+        match self {
+            RequestSource::Frontend(r) => r.into_response(),
+            RequestSource::Unknown(b) => Response::new(b),
+        }
+    }
+}
+
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(DashMap::new);
 
+#[axum::debug_handler]
 pub async fn accept_form(
     headers: HeaderMap,
     multipart: Multipart,
@@ -40,7 +58,23 @@ pub async fn accept_form(
     res?;
     info!("Completed upload of {uuid}");
 
-    Ok(Redirect::to(&format!("/uploads/{uuid}")))
+    let source = match headers
+        .get("tapfer-source")
+        .map(|e| e.to_str())
+        .transpose()?
+    {
+        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("/uploads/{uuid}"))),
+        _ => {
+            let host = env::var("HOST").expect("Should ok as main checks this var already");
+            let method = if host.contains("localhost") {
+                "https://"
+            } else {
+                ""
+            };
+            RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{uuid}\n")))
+        }
+    };
+    Ok(source)
 }
 
 async fn do_upload(
@@ -71,8 +105,10 @@ async fn do_upload(
 
     expiration_field(headers.get("tapfer-expiration"), &mut meta).await?;
 
-    info!("Adding progress token {in_progress_token:?}");
-    PROGRESS_TOKEN_LUT.insert(in_progress_token.expect("infallible"), uuid);
+    if let Some(tok) = in_progress_token {
+        info!("Adding progress token {tok}");
+        PROGRESS_TOKEN_LUT.insert(tok, uuid);
+    }
     defer! {
         if let Some(t) = in_progress_token {
             info!("deleting progress token {t}");
@@ -108,7 +144,7 @@ async fn payload_field(
     size: Option<u64>,
 ) -> TapferResult<()> {
     let file_name = field.file_name().unwrap().to_string();
-    let content_type = field.content_type().unwrap().to_string();
+    let content_type = field.content_type().unwrap_or("unknown").to_string();
 
     let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client

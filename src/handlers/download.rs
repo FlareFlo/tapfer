@@ -72,7 +72,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
 }
 
 async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<UploadHandle>)> {
-    let uuid = Uuid::from_str(&path)?;
+    let uuid = Uuid::from_str(path)?;
     let res = match fs::try_exists(&format!("data/{uuid}/meta.toml")).await.ok() {
         // Regular download
         Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),

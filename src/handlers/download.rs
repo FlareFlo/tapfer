@@ -1,10 +1,10 @@
-use crate::updown::upload_pool::UPLOAD_POOL;
-use crate::updown::upload_handle::UploadHandle;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
+use crate::updown::upload_handle::UploadHandle;
+use crate::updown::upload_pool::{UPLOAD_POOL, UploadFsm};
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
@@ -13,19 +13,16 @@ use axum::response::{Html, IntoResponse};
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
 use std::io;
-use std::io::ErrorKind;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
-use std::time::Duration;
 use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
 use tokio::fs::File;
-use tokio::time::sleep;
-use tokio::{fs, select};
+use tokio::{fs};
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use uuid::Uuid;
 
 #[derive(Template)]
@@ -146,7 +143,7 @@ struct DownloadStream {
     meta: FileMeta,
     uuid: Uuid,
     handle: Option<UploadHandle>,
-    self_progress: usize,
+    self_progress: u64,
     is_updown: bool,
 }
 
@@ -198,41 +195,34 @@ impl futures_core::Stream for DownloadStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Some(handle) = &self.handle {
             // Delay polling the file when it is incomplete and the current progress is very close to the upload progress
-            if !handle.is_complete_blocking()
-                && (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress
-            {
-                if handle.has_upload_failed() {
+            let fsm = handle.read_fsm_blocking().clone();
+
+            match fsm {
+                UploadFsm::Failed => {
                     return Poll::Ready(Some(Err(TapferError::Custom {
                         status_code: StatusCode::RESET_CONTENT,
                         body: Html("Upload was aborted".to_owned()),
                     }
                     .into())));
                 }
-                let waker = cx.waker().clone();
-                let handle = handle.clone();
-                tokio::spawn(async move {
-                    let timeout = sleep(Duration::from_millis(1000));
-                    let progress = handle.wait_for_progress();
-                    select! {
-                        _ = timeout => {
-                            if !handle.is_complete().await {
-                                warn!("Download task timed out. Is the sender too slow?");
-                            }
-                        }
-                        _ = progress => {
-                            // Do nothing, this is good
-                        }
-                    };
-                    // Wake either way
-                    waker.wake();
-                });
-                return Poll::Pending;
+                UploadFsm::InProgress { progress } => {
+                    if (progress - DOWNLOAD_CHUNKSIZE as u64 * 2) < self.self_progress {
+                        let waker = cx.waker().clone();
+                        let handle = handle.clone();
+                        tokio::spawn(async move {
+                            handle.wait_for_progress().await;
+                            waker.wake();
+                        });
+                        return Poll::Pending;
+                    }
+                }
+                UploadFsm::Completed =>{},
             }
         }
 
         let poll_res = self.inner.poll_next_unpin(cx);
         if let Poll::Ready(Some(Ok(b))) = &poll_res {
-            self.self_progress += b.len();
+            self.self_progress += b.len() as u64;
         }
         poll_res
     }

@@ -1,10 +1,7 @@
+use crate::error::{TapferError, TapferResult};
 use crate::updown::upload_handle::UploadHandle;
-use crate::file_meta::FileMeta;
 use dashmap::DashMap;
-use std::sync::{Arc, LazyLock};
-use tokio::sync::{Notify, RwLock};
-use tokio::task::block_in_place;
-use tracing::error;
+use std::sync::{LazyLock};
 use uuid::Uuid;
 
 pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
@@ -17,11 +14,43 @@ pub struct UploadPool {
 
 /// The progress of an upload
 #[derive(Debug, Copy, Clone)]
-pub struct UploadProgress {
-    /// Bytes already written to disk
-    pub progress: usize,
-    pub complete: bool,
-    pub upload_failed: bool,
+pub enum UploadFsm {
+    Failed,
+    InProgress {
+        /// Bytes already written to disk
+        progress: u64,
+    },
+    Completed,
+}
+
+impl UploadFsm {
+    pub fn initial() -> Self {
+        Self::InProgress { progress: 0 }
+    }
+
+    pub fn add_progress(&mut self, new_progress: usize) -> TapferResult<()> {
+        match self {
+            UploadFsm::InProgress { progress } => {
+                *progress += new_progress as u64;
+                Ok(())
+            }
+            _ => Err(TapferError::UploadHandleSize(*self)),
+        }
+    }
+    pub fn mark_complete(&mut self) {
+        *self = Self::Completed;
+    }
+
+    pub fn is_complete(&self) -> bool {
+        matches!(self, UploadFsm::Completed)
+    }
+
+    pub fn get_progress(&self) -> Option<u64> {
+        match self {
+            UploadFsm::InProgress { progress, .. } => Some(*progress),
+            _ => None,
+        }
+    }
 }
 
 impl UploadPool {

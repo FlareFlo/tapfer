@@ -1,3 +1,4 @@
+use crate::updown::upload_pool::UploadFsm;
 use axum::extract::multipart::MultipartError;
 use axum::http::StatusCode;
 use axum::http::header::{InvalidHeaderValue, ToStrError};
@@ -27,6 +28,9 @@ pub enum TapferError {
 
     #[error("Attempted to add size to already known size")]
     AddSizeToAlreadyKnown,
+
+    #[error("Added size to UploadFsm when it was already {0:?}")]
+    UploadHandleSize(UploadFsm),
 
     #[error("The requested token {0} does not have a matching UUID/upload")]
     TokenDoesNotExist(u32),
@@ -96,6 +100,7 @@ impl IntoResponse for TapferError {
             QRCodeError(_) => generic("qr code generation"),
             InvalidExpiration(s) => generic(&format!("invalid expiration: {s}")),
             TimeFormat(_) => generic("time format"),
+            UploadHandleSize(_) => generic("upload handle size"),
         }
     }
 }

@@ -1,9 +1,9 @@
-use crate::updown::upload_handle::UploadHandle;
-use crate::updown::upload_pool::UPLOAD_POOL;
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
+use crate::updown::upload_handle::UploadHandle;
+use crate::updown::upload_pool::{UploadFsm, UPLOAD_POOL};
 use axum::body::Body;
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path};
@@ -18,12 +18,10 @@ use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
-use std::time::Duration;
 use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
-use tokio::task::block_in_place;
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -165,7 +163,7 @@ async fn payload_field(
     )
     .await?;
     // The upload is complete, mark the upload as complete
-    handle.mark_complete().await;
+    handle.write_fsm().await.mark_complete();
     Ok(())
 }
 
@@ -243,7 +241,10 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
             }
             let handle = self.upload_handle.clone();
             task::spawn(async move {
-                handle.add_progress(n).await;
+                let e = handle.write_fsm().await.add_progress(n);
+                if e.is_err() { 
+                    error!("Failed to add progress, fsm is already marked as completed?");
+                }
                 handle.notify_all_downloaders();
             });
         }
@@ -263,8 +264,9 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
 
 impl<S> Drop for UpdownWriter<S> {
     fn drop(&mut self) {
-        if !self.upload_handle.is_complete_blocking() {
-            self.upload_handle.set_upload_failed();
+        let mut fsm = self.upload_handle.write_fsm_blocking();
+        if !fsm.is_complete() {
+            *fsm = UploadFsm::Failed;
         }
     }
 }

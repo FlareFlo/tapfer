@@ -1,5 +1,5 @@
+use crate::updown::upload_pool::UploadHandle;
 use crate::error::{TapferError, TapferResult};
-use crate::upload_pool::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
 use time::{Duration, UtcDateTime};

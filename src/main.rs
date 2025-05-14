@@ -3,7 +3,7 @@ mod error;
 mod file_meta;
 mod handlers;
 mod retention_control;
-mod upload_pool;
+mod updown;
 
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;

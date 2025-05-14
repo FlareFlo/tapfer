@@ -1,9 +1,10 @@
+use crate::updown::upload_pool::UPLOAD_POOL;
+use crate::updown::upload_pool::UploadHandle;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
-use crate::upload_pool::{UPLOAD_POOL, UploadHandle};
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;

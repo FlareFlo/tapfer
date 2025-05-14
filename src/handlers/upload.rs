@@ -143,7 +143,7 @@ async fn payload_field(
     metadata_builder: FileMetaBuilder,
     size: Option<u64>,
 ) -> TapferResult<()> {
-    let file_name = field.file_name().unwrap().to_string();
+    let file_name = field.file_name().map(ToOwned::to_owned).unwrap_or_else(|| uuid.to_string());
     let content_type = field.content_type().unwrap_or("unknown").to_string();
 
     let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);

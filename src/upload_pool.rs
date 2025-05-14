@@ -29,6 +29,7 @@ pub struct UploadProgress {
     /// Bytes already written to disk
     progress: usize,
     complete: bool,
+    upload_failed: bool,
 }
 
 impl UploadPool {
@@ -43,6 +44,7 @@ impl UploadPool {
             handle: Arc::new(RwLock::new(UploadProgress {
                 progress: 0,
                 complete: false,
+                upload_failed: false,
             })),
             uuid,
             file_meta,
@@ -65,6 +67,13 @@ impl UploadHandle {
 
     pub fn get_progress_blocking(&self) -> usize {
         block_in_place(|| self.handle.blocking_read().progress)
+    }
+
+    pub fn has_upload_failed(&self) -> bool {
+        self.handle.blocking_read().upload_failed
+    }
+    pub fn set_upload_failed(&self) {
+        self.handle.blocking_write().upload_failed = true;
     }
 
     /// Waits for uploader to add progress

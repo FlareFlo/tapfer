@@ -17,10 +17,12 @@ use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
+use tokio::task::block_in_place;
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -77,11 +79,7 @@ pub async fn accept_form(
     Ok(source)
 }
 
-async fn do_upload(
-    headers: &HeaderMap,
-    mut multipart: Multipart,
-    uuid: Uuid,
-) -> TapferResult<impl IntoResponse> {
+async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, uuid: Uuid) -> TapferResult<()> {
     let mut meta = FileMetaBuilder::default();
 
     let size: Option<u64> = headers
@@ -143,20 +141,23 @@ async fn payload_field(
     metadata_builder: FileMetaBuilder,
     size: Option<u64>,
 ) -> TapferResult<()> {
-    let file_name = field.file_name().map(ToOwned::to_owned).unwrap_or_else(|| uuid.to_string());
+    let file_name = field
+        .file_name()
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| uuid.to_string());
     let content_type = field.content_type().unwrap_or("unknown").to_string();
 
     let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client
     let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
     let f = File::create(format!("data/{uuid}/{file_name}")).await?;
-    let mut f = WriterProgress::new(f, handle.clone(), metadata, size.is_none());
+    let mut f = UpdownWriter::new(f, handle.clone(), metadata, size.is_none());
     let mut s = BufReader::with_capacity(
-        UPLOAD_BUFSIZE,
+        1000,
         StreamReader::new(field.map_err(TapferError::AxumMultipart)),
     );
     copy_buf(&mut s, &mut f).await?;
-    let metadata = f.disassemble();
+    let metadata = f.metadata();
     fs::write(
         format!("data/{uuid}/meta.toml"),
         toml::to_string_pretty(&metadata)?.as_bytes(),
@@ -198,14 +199,14 @@ pub async fn progress_token_to_uuid(Path(path): Path<String>) -> TapferResult<im
         .to_string())
 }
 
-pub struct WriterProgress<S> {
+pub struct UpdownWriter<S> {
     file: S,
     upload_handle: UploadHandle,
     metadata: FileMeta,
     write_to_meta: bool,
 }
 
-impl<S> WriterProgress<S> {
+impl<S> UpdownWriter<S> {
     pub fn new(
         file: S,
         upload_handle: UploadHandle,
@@ -220,12 +221,12 @@ impl<S> WriterProgress<S> {
         }
     }
 
-    pub fn disassemble(self) -> FileMeta {
-        self.metadata
+    pub fn metadata(&self) -> &FileMeta {
+        &self.metadata
     }
 }
 
-impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
+impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -256,5 +257,13 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for WriterProgress<S> {
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
         let mut pinned = pin!(&mut self.file);
         pinned.as_mut().poll_shutdown(cx)
+    }
+}
+
+impl<S> Drop for UpdownWriter<S> {
+    fn drop(&mut self) {
+        if !self.upload_handle.is_complete_blocking() {
+            self.upload_handle.set_upload_failed();
+        }
     }
 }

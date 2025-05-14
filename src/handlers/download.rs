@@ -12,6 +12,7 @@ use axum::response::{Html, IntoResponse};
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
 use std::io;
+use std::io::ErrorKind;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
@@ -199,6 +200,13 @@ impl futures_core::Stream for DownloadStream {
             if !handle.is_complete_blocking()
                 && (handle.get_progress_blocking() - DOWNLOAD_CHUNKSIZE * 2) < self.self_progress
             {
+                if handle.has_upload_failed() {
+                    return Poll::Ready(Some(Err(TapferError::Custom {
+                        status_code: StatusCode::RESET_CONTENT,
+                        body: Html("Upload was aborted".to_owned()),
+                    }
+                    .into())));
+                }
                 let waker = cx.waker().clone();
                 let handle = handle.clone();
                 tokio::spawn(async move {
@@ -220,8 +228,7 @@ impl futures_core::Stream for DownloadStream {
                 return Poll::Pending;
             }
         }
-        
-        
+
         let poll_res = self.inner.poll_next_unpin(cx);
         if let Poll::Ready(Some(Ok(b))) = &poll_res {
             self.self_progress += b.len();

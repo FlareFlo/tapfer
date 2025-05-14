@@ -153,7 +153,7 @@ async fn payload_field(
     let f = File::create(format!("data/{uuid}/{file_name}")).await?;
     let mut f = UpdownWriter::new(f, handle.clone(), metadata, size.is_none());
     let mut s = BufReader::with_capacity(
-        1000,
+        UPLOAD_BUFSIZE,
         StreamReader::new(field.map_err(TapferError::AxumMultipart)),
     );
     copy_buf(&mut s, &mut f).await?;

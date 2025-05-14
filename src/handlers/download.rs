@@ -16,10 +16,11 @@ use std::io;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
 use tokio::fs::File;
-use tokio::{fs};
+use tokio::{fs, select};
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
@@ -56,7 +57,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)
-        } else if progress_handle.is_some() {
+        } else if matches!(progress_handle, UpDownFsm::UpdownInProgress { .. }) {
             "upload in progress"
         } else {
             &human_bytes(meta.size() as f64)
@@ -70,11 +71,14 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     Ok(Html(template.render()?))
 }
 
-async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<UploadHandle>)> {
+async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), UpDownFsm)> {
     let uuid = Uuid::from_str(path)?;
     let res = match fs::try_exists(&format!("data/{uuid}/meta.toml")).await.ok() {
         // Regular download
-        Some(true) => (FileMeta::read_from_uuid_path(&path).await?, None),
+        Some(true) => (
+            FileMeta::read_from_uuid_path(&path).await?,
+            UpDownFsm::Completed,
+        ),
         // In-progress upload or doesnt exist
         _ => {
             let uuid = Uuid::from_str(path)?;
@@ -87,10 +91,20 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
                     });
                 }
                 // The upload is in-progress
-                Some(handle) => (
-                    (*handle.key(), FileMeta::from_upload_handle(handle.value())),
-                    Some(handle.clone()),
-                ),
+                Some(handle) => {
+                    let fsm = if UPLOAD_POOL.uploads.contains_key(&uuid) {
+                        UpDownFsm::UpdownInProgress {
+                            progress: 0,
+                            handle: handle.clone(),
+                        }
+                    } else {
+                        UpDownFsm::Completed
+                    };
+                    (
+                        (*handle.key(), FileMeta::from_upload_handle(handle.value())),
+                        fsm,
+                    )
+                }
             }
         }
     };
@@ -98,7 +112,7 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), Option<U
 }
 
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, meta), handle) = get_any_meta(&path).await?;
+    let ((uuid, meta), fsm) = get_any_meta(&path).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -117,7 +131,7 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
         );
     }
     // or when there is no ongoing upload
-    else if handle.is_none() {
+    else if matches!(fsm, UpDownFsm::Completed) {
         headers.insert(
             header::CONTENT_LENGTH,
             HeaderValue::from_str(&meta.size().to_string())?,
@@ -127,13 +141,8 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let path = format!("data/{uuid}/{}", meta.name());
     let file = File::open(&path).await?;
     let stream = ReaderStream::with_capacity(file, DOWNLOAD_CHUNKSIZE);
-    let wrapped = DownloadStream::new(
-        stream,
-        uuid,
-        meta,
-        handle,
-        UPLOAD_POOL.uploads.contains_key(&uuid),
-    );
+
+    let wrapped = DownloadStream::new(stream, uuid, meta, fsm);
     Ok((headers, Body::from_stream(wrapped)))
 }
 
@@ -142,26 +151,29 @@ struct DownloadStream {
     inner: ReaderStream<File>,
     meta: FileMeta,
     uuid: Uuid,
-    handle: Option<UploadHandle>,
-    self_progress: u64,
-    is_updown: bool,
+    fsm: UpDownFsm,
+}
+
+pub enum UpDownFsm {
+    Completed,
+    UpdownInProgress { progress: u64, handle: UploadHandle },
+}
+
+impl UpDownFsm {
+    pub fn add_progress(&mut self, additional: u64) {
+        if let UpDownFsm::UpdownInProgress {progress, ..} = self {
+            *progress += additional;
+        }
+    }
 }
 
 impl DownloadStream {
-    fn new(
-        inner: ReaderStream<File>,
-        uuid: Uuid,
-        meta: FileMeta,
-        handle: Option<UploadHandle>,
-        is_updown: bool,
-    ) -> Self {
+    fn new(inner: ReaderStream<File>, uuid: Uuid, meta: FileMeta, fsm: UpDownFsm) -> Self {
         Self {
             inner,
             meta,
             uuid,
-            handle,
-            self_progress: 0,
-            is_updown,
+            fsm,
         }
     }
 }
@@ -169,7 +181,7 @@ impl DownloadStream {
 impl Drop for DownloadStream {
     fn drop(&mut self) {
         // Do not delete files in upload when an in-progress download fails early
-        if self.is_updown {
+        if !matches!(self.fsm, UpDownFsm::Completed) {
             return;
         }
         let meta = self.meta.clone();
@@ -193,36 +205,60 @@ impl futures_core::Stream for DownloadStream {
     type Item = Result<Bytes, io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if let Some(handle) = &self.handle {
-            // Delay polling the file when it is incomplete and the current progress is very close to the upload progress
-            let fsm = handle.read_fsm_blocking().clone();
+        // Check if were in progress
+        match &self.fsm {
+            // Conditionally wake here
+            UpDownFsm::UpdownInProgress {
+                handle,
+                progress: download_progress,
+            } => {
+                // Delay polling the file when it is incomplete and the current progress is very close to the upload progress
+                let upload_fsm = *handle.read_fsm_blocking();
 
-            match fsm {
-                UploadFsm::Failed => {
-                    return Poll::Ready(Some(Err(TapferError::Custom {
-                        status_code: StatusCode::RESET_CONTENT,
-                        body: Html("Upload was aborted".to_owned()),
+                // Ensure all branches either return or wake
+                match upload_fsm {
+                    // Abort download on upload error
+                    UploadFsm::Failed => {
+                        return Poll::Ready(Some(Err(TapferError::Custom {
+                            status_code: StatusCode::RESET_CONTENT,
+                            body: Html("Upload was aborted".to_owned()),
+                        }
+                        .into())));
                     }
-                    .into())));
-                }
-                UploadFsm::InProgress { progress } => {
-                    if (progress - DOWNLOAD_CHUNKSIZE as u64 * 2) < self.self_progress {
-                        let waker = cx.waker().clone();
-                        let handle = handle.clone();
-                        tokio::spawn(async move {
-                            handle.wait_for_progress().await;
-                            waker.wake();
-                        });
-                        return Poll::Pending;
+                    // Wake once progress is available only
+                    UploadFsm::InProgress {
+                        progress: upload_progress,
+                    } => {
+                        if (upload_progress - DOWNLOAD_CHUNKSIZE as u64 * 2) < *download_progress {
+                            let waker = cx.waker().clone();
+                            let handle = handle.clone();
+                            // Ensure that we do not wait for progress perpetually, time out after a bit to poll the UploadFSM again in case it failed
+                            tokio::spawn(async move {
+                                let timeout = tokio::time::sleep(Duration::from_millis(100));
+                                let progress = handle.wait_for_progress();
+                                select! {
+                                    _ = timeout => (),
+                                    _ = progress => (),
+                                }
+                                waker.wake();
+                            });
+                            return Poll::Pending;
+                        }
+                    }
+                    // Wake once such that we get polled again to wake from below
+                    UploadFsm::Completed => {
+                        self.fsm = UpDownFsm::Completed;
+                        cx.waker().wake_by_ref();
                     }
                 }
-                UploadFsm::Completed =>{},
             }
+            // Wake, always
+            _ => cx.waker().wake_by_ref(),
         }
 
         let poll_res = self.inner.poll_next_unpin(cx);
         if let Poll::Ready(Some(Ok(b))) = &poll_res {
-            self.self_progress += b.len() as u64;
+            self.fsm.add_progress(b.len() as u64);
         }
         poll_res
     }

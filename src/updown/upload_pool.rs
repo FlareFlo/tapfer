@@ -1,7 +1,7 @@
 use crate::error::{TapferError, TapferResult};
 use crate::updown::upload_handle::UploadHandle;
 use dashmap::DashMap;
-use std::sync::{LazyLock};
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);

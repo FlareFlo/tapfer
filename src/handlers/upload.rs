@@ -3,7 +3,7 @@ use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use crate::updown::upload_handle::UploadHandle;
-use crate::updown::upload_pool::{UploadFsm, UPLOAD_POOL};
+use crate::updown::upload_pool::{UPLOAD_POOL, UploadFsm};
 use axum::body::Body;
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path};
@@ -242,7 +242,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
             let handle = self.upload_handle.clone();
             task::spawn(async move {
                 let e = handle.write_fsm().await.add_progress(n);
-                if e.is_err() { 
+                if e.is_err() {
                     error!("Failed to add progress, fsm is already marked as completed?");
                 }
                 handle.notify_all_downloaders();

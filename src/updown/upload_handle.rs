@@ -1,8 +1,8 @@
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use crate::file_meta::FileMeta;
 use crate::updown::upload_pool::{UPLOAD_POOL, UploadFsm, UploadPool};
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::sync::{Notify, RwLock};
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use tokio::task::block_in_place;
 use tracing::error;
 use uuid::Uuid;
@@ -38,7 +38,7 @@ impl UploadHandle {
     pub async fn write_fsm(&self) -> RwLockWriteGuard<UploadFsm> {
         self.handle.write().await
     }
-    
+
     pub fn read_fsm_blocking(&self) -> RwLockReadGuard<UploadFsm> {
         block_in_place(|| self.handle.blocking_read())
     }

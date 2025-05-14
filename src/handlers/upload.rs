@@ -1,4 +1,4 @@
-use crate::updown::upload_pool::UploadHandle;
+use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UPLOAD_POOL;
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};

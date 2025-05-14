@@ -1,5 +1,5 @@
 use crate::updown::upload_pool::UPLOAD_POOL;
-use crate::updown::upload_pool::UploadHandle;
+use crate::updown::upload_handle::UploadHandle;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};

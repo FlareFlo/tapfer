@@ -1,4 +1,4 @@
-use crate::updown::upload_pool::UploadHandle;
+use crate::updown::upload_handle::UploadHandle;
 use crate::error::{TapferError, TapferResult};
 use std::path::Path;
 use std::str::FromStr;

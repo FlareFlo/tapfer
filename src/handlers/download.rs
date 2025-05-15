@@ -154,12 +154,17 @@ struct DownloadStream {
     fsm: UpDownFsm,
 }
 
+
+/// FSM describing the state of a possibly ongoing upload
 pub enum UpDownFsm {
     Completed,
     UpdownInProgress { progress: u64, handle: UploadHandle },
 }
 
 impl UpDownFsm {
+    
+    /// Adds extra progress to current one.
+    /// Does nothing when the upload is already complete
     pub fn add_progress(&mut self, additional: u64) {
         if let UpDownFsm::UpdownInProgress {progress, ..} = self {
             *progress += additional;
@@ -178,6 +183,8 @@ impl DownloadStream {
     }
 }
 
+/// Responsible for deleting single-download files.
+/// Skips deletion when the download is initiated during upload
 impl Drop for DownloadStream {
     fn drop(&mut self) {
         // Do not delete files in upload when an in-progress download fails early
@@ -201,6 +208,10 @@ impl Drop for DownloadStream {
     }
 }
 
+/// Main goals here:
+/// Permit unbounded download when the asset is a regular file, transparently polling inner.
+/// Throttle download to the already uploaded (and written) data boundary, when upload is in progress.
+/// Abort download when the uploader failed/cancelled.
 impl futures_core::Stream for DownloadStream {
     type Item = Result<Bytes, io::Error>;
 

@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 mod configuration;
 mod error;
 mod file_meta;

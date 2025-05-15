@@ -1,3 +1,2 @@
-- fail download when upstream closes prematurely - in progress
 - delete endpoint and button on asset
 - ensure single downloads are still expired after a few days

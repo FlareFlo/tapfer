@@ -75,7 +75,8 @@
 
 			<div>
 				Or use CURL <br>
-				<code>curl -X POST https://tapfer.lkl.lol -F file=@</code><code style="color: #00e2ff; !important;">path</code>
+				<code id="curl_command" style="user-select: all">curl -X POST https://example.com -F file=@</code><code style="color: #00e2ff; !important; user-select: none">path</code>
+				<script>const loc = window.location.origin; const fmt = `curl -X POST ${loc} -F file=@`; document.getElementById("curl_command").innerText = fmt</script>
 			</div>
 
 			<div id="progress_text">0MB/0MB 0MB/s</div>

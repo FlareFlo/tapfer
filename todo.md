@@ -1,2 +1,2 @@
 - delete endpoint and button on asset
-- ensure single downloads are still expired after a few days
+- print qrcode in shell? 

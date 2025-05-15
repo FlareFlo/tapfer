@@ -212,7 +212,6 @@ impl futures_core::Stream for DownloadStream {
                 handle,
                 progress: download_progress,
             } => {
-                // Delay polling the file when it is incomplete and the current progress is very close to the upload progress
                 let upload_fsm = *handle.read_fsm_blocking();
 
                 // Ensure all branches either return or wake
@@ -220,7 +219,7 @@ impl futures_core::Stream for DownloadStream {
                     // Abort download on upload error
                     UploadFsm::Failed => {
                         return Poll::Ready(Some(Err(TapferError::Custom {
-                            status_code: StatusCode::RESET_CONTENT,
+                            status_code: StatusCode::GONE,
                             body: Html("Upload was aborted".to_owned()),
                         }
                         .into())));
@@ -229,6 +228,7 @@ impl futures_core::Stream for DownloadStream {
                     UploadFsm::InProgress {
                         progress: upload_progress,
                     } => {
+                        // Delay polling the file when it is incomplete and the current progress is very close to the upload progress
                         if (upload_progress - DOWNLOAD_CHUNKSIZE as u64 * 2) < *download_progress {
                             let waker = cx.waker().clone();
                             let handle = handle.clone();

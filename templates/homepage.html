@@ -50,6 +50,10 @@
 		#filelink:hover {
 			color: crimson;
 		}
+
+		.show_on_upload {
+			visibility: hidden;
+		}
 	</style>
 </head>
 <body>
@@ -75,14 +79,14 @@
 
 			<div>
 				Or use CURL <br>
-				<code id="curl_command" style="user-select: all">curl -X POST https://example.com -F file=@</code><code style="color: #00e2ff; !important; user-select: none">path</code>
+				<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;">curl -X POST https://example.com -F file=@</code><code style="color: #00e2ff; !important; user-select: none; padding: 0.2rem 0.2rem 0.2rem 0;">$FILEPATH</code>
 				<script>const loc = window.location.origin; const fmt = `curl -X POST ${loc} -F file=@`; document.getElementById("curl_command").innerText = fmt</script>
 			</div>
 
-			<div id="progress_text">0MB/0MB 0MB/s</div>
+			<div id="progress_text" class="show_on_upload">0MB/0MB 0MB/s</div>
 			<div>
-				<a id="download_url" href="unset" target="_blank">Download URL</a>
-				<button id="copy_link_button">Copy to clipboard</button>
+				<a id="download_url" href="unset" target="_blank" class="show_on_upload">Download URL</a>
+				<button id="copy_link_button" class="show_on_upload">Copy to clipboard</button>
 			</div>
 			<img rel="preload" id="qrcode" src="/qrcg/placeholder.png" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 		</div>
@@ -236,6 +240,11 @@
         // Unset all form fields, as only file will be needed. The rest is in the headers
         formData.delete("expiration");
         main_xhr.send(formData);
+
+        const show_elems = document.getElementsByClassName("show_on_upload");
+        for (const elem of show_elems) {
+            elem.style.visibility = "unset";
+		}
     });
 </script>
 </body>

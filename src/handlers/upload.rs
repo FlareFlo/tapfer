@@ -68,9 +68,9 @@ pub async fn accept_form(
         _ => {
             let host = env::var("HOST").expect("Should ok as main checks this var already");
             let method = if host.contains("localhost") {
-                "https://"
-            } else {
                 ""
+            } else {
+                "https://"
             };
             RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{uuid}\n")))
         }

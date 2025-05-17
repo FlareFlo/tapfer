@@ -20,9 +20,10 @@ pub async fn get_placeholder_qrcode() -> TapferResult<impl IntoResponse> {
 
 fn qr_from_uuid(uuid: Uuid) -> TapferResult<Vec<u8>> {
     let host = env::var("HOST").expect("Should ok as main checks this var already");
-    let method = if host != "localhost" { "https://" } else { "" };
     let qrc = qrcode_generator::to_png_to_vec(
-        format!("{method}{host}/uploads/{uuid}",).as_bytes(),
+        // Uppercase such that this falls into the Alphanumeric encoding for higher efficiency
+        // https://en.wikipedia.org/wiki/QR_code
+        format!("{host}/uploads/{uuid}",).to_ascii_uppercase().as_bytes(),
         QR_CODE_ECC,
         QR_CODE_SIZE,
     )?;

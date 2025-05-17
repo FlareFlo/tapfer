@@ -1,17 +1,14 @@
+pub(crate) use crate::GLOBAL_RETENTION_POLICY;
+use crate::UPLOAD_POOL;
 use crate::error::TapferResult;
 use crate::file_meta::FileMeta;
-use crate::updown::upload_pool::UPLOAD_POOL;
 use std::ops::Add;
 use std::str::FromStr;
-use std::sync::LazyLock;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
 use tracing::info;
 use uuid::Uuid;
-
-pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
-    LazyLock::new(GlobalRetentionPolicy::default);
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,

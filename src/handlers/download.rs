@@ -1,10 +1,11 @@
+use crate::UPLOAD_POOL;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers::not_found::NotFound;
 use crate::retention_control::delete_asset;
 use crate::updown::upload_handle::UploadHandle;
-use crate::updown::upload_pool::{UPLOAD_POOL, UploadFsm};
+use crate::updown::upload_pool::UploadFsm;
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
@@ -38,6 +39,7 @@ struct DownloadTemplate<'a> {
     embed_image_url: &'a str,
     qr_size: usize,
     embed_description: &'a str,
+    delete_url: &'a str,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
@@ -66,6 +68,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         embed_image_url: &format!("/qrcg/{uuid}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
+        delete_url:  &format!("/uploads/{uuid}/delete"),
     };
 
     Ok(Html(template.render()?))

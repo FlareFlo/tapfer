@@ -6,6 +6,9 @@
 	{% include "favicon.html" %}
 	{% include "meta.html" %}
 	<style>
+		#delete_button {
+			background: crimson;
+		}
 	</style>
 </head>
 <body>
@@ -17,9 +20,14 @@
 			<p><strong>Expires:</strong> {{expiry}}</p>
 			<p><strong>Size:</strong> {{filesize}}</p>
 		</div>
-		<form action="{{download_url}}" method="get">
-			<button type="submit">Download</button>
-		</form>
+		<div style="display: flex; gap: 10px;">
+			<form action="{{download_url}}" method="get">
+				<button type="submit">Download</button>
+			</form>
+			<form action="{{delete_url}}" method="post">
+				<button type="submit" id="delete_button">Delete</button>
+			</form>
+		</div>
 		<a href="{{download_url}}">Direct download link</a>
 		<img src="/qrcg/{{ uuid }}", width=" {{qr_size}} px", height=" {{qr_size }} px">
 	</div>

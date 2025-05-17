@@ -3,20 +3,20 @@ use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
 use crate::updown::upload_handle::UploadHandle;
-use crate::updown::upload_pool::{UPLOAD_POOL, UploadFsm};
+use crate::updown::upload_pool::UploadFsm;
+use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL};
 use axum::body::Body;
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path};
-use axum::http::{HeaderMap, HeaderValue};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::response::Html;
 use axum::response::{IntoResponse, Redirect, Response};
-use dashmap::DashMap;
 use futures_util::TryStreamExt;
 use scopeguard::defer;
 use std::env;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
-use std::sync::LazyLock;
 use std::task::{Context, Poll};
 use time::Duration as TimeDuration;
 use tokio::fs::File;
@@ -40,8 +40,6 @@ impl IntoResponse for RequestSource {
         }
     }
 }
-
-pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(DashMap::new);
 
 #[axum::debug_handler]
 pub async fn accept_form(
@@ -231,6 +229,15 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, Error>> {
+        if *self.upload_handle.read_fsm_blocking() == UploadFsm::Failed {
+            return Poll::Ready(
+                Err(TapferError::Custom {
+                    status_code: StatusCode::NOT_FOUND,
+                    body: Html("upload failed".to_owned()),
+                }.into()),
+            );
+        }
+
         let mut pinned = pin!(&mut self.file);
         let pollres = pinned.as_mut().poll_write(cx, buf);
         if let Poll::Ready(Ok(n)) = pollres {

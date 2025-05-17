@@ -1,2 +1,2 @@
-- delete endpoint and button on asset
+- delete endpoint and button on asset. Works for complete uploads, fails for in-progress because JS sucks ass
 - print qrcode in shell? 

@@ -8,10 +8,13 @@ mod updown;
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;
 use crate::handlers::upload;
-use crate::retention_control::{GLOBAL_RETENTION_POLICY, check_all_assets};
-use axum::routing::get_service;
+use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
+use crate::updown::upload_pool::UploadPool;
+use axum::routing::{get_service, post};
 use axum::{Router, extract::DefaultBodyLimit, routing::get};
+use dashmap::DashMap;
 use handlers::homepage;
+use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
 use tokio::time::sleep;
@@ -19,6 +22,12 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
+
+pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(DashMap::new);
+pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
+    LazyLock::new(GlobalRetentionPolicy::default);
+pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
@@ -51,6 +60,10 @@ async fn main() -> TapferResult<()> {
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route("/uploads/{uuid}", get(handlers::download::download_html))
+        .route(
+            "/uploads/{uuid}/delete",
+            post(handlers::delete::request_delete_asset),
+        )
         .route(
             "/uploads/query_uuid/{token}",
             get(handlers::upload::progress_token_to_uuid),

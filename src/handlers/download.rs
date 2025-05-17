@@ -154,7 +154,6 @@ struct DownloadStream {
     fsm: UpDownFsm,
 }
 
-
 /// FSM describing the state of a possibly ongoing upload
 pub enum UpDownFsm {
     Completed,
@@ -162,11 +161,10 @@ pub enum UpDownFsm {
 }
 
 impl UpDownFsm {
-    
     /// Adds extra progress to current one.
     /// Does nothing when the upload is already complete
     pub fn add_progress(&mut self, additional: u64) {
-        if let UpDownFsm::UpdownInProgress {progress, ..} = self {
+        if let UpDownFsm::UpdownInProgress { progress, .. } = self {
             *progress += additional;
         }
     }

@@ -4,6 +4,7 @@ use axum::http::StatusCode;
 use axum::http::header::{InvalidHeaderValue, ToStrError};
 use axum::response::{Html, IntoResponse, Response};
 use qrcode_generator::QRCodeError;
+use std::array::TryFromSliceError;
 use std::io;
 use std::num::ParseIntError;
 use time::error::Format;
@@ -70,6 +71,9 @@ pub enum TapferError {
 
     #[error(transparent)]
     TimeFormat(#[from] Format),
+
+    #[error(transparent)]
+    TryFromSlice(#[from] TryFromSliceError),
 }
 
 impl IntoResponse for TapferError {
@@ -101,6 +105,7 @@ impl IntoResponse for TapferError {
             InvalidExpiration(s) => generic(&format!("invalid expiration: {s}")),
             TimeFormat(_) => generic("time format"),
             UploadHandleSize(_) => generic("upload handle size"),
+            TryFromSlice(_) => generic("try from slice"),
         }
     }
 }

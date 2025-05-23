@@ -142,7 +142,7 @@ async fn payload_field(
         .file_name()
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| uuid.to_string());
-    let content_type = field.content_type().unwrap_or("unknown").to_string();
+    let content_type = field.content_type().unwrap_or(mime::APPLICATION_OCTET_STREAM.as_ref()).to_string();
 
     let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client

@@ -142,7 +142,10 @@ async fn payload_field(
         .file_name()
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| uuid.to_string());
-    let content_type = field.content_type().unwrap_or(mime::APPLICATION_OCTET_STREAM.as_ref()).to_string();
+    let content_type = field
+        .content_type()
+        .unwrap_or(mime::APPLICATION_OCTET_STREAM.as_ref())
+        .to_string();
 
     let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client
@@ -169,9 +172,7 @@ async fn expiration_field(
     field: Option<&HeaderValue>,
     meta: &mut FileMetaBuilder,
 ) -> TapferResult<()> {
-    let f = if let Some(f) = field {
-        f.to_str()?
-    } else {
+    let Some(f) = field.map(|f| f.to_str()).transpose()? else {
         return Ok(());
     };
     match f {
@@ -230,12 +231,11 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
         buf: &[u8],
     ) -> Poll<Result<usize, Error>> {
         if *self.upload_handle.read_fsm_blocking() == UploadFsm::Failed {
-            return Poll::Ready(
-                Err(TapferError::Custom {
-                    status_code: StatusCode::NOT_FOUND,
-                    body: Html("upload failed".to_owned()),
-                }.into()),
-            );
+            return Poll::Ready(Err(TapferError::Custom {
+                status_code: StatusCode::NOT_FOUND,
+                body: Html("upload failed".to_owned()),
+            }
+            .into()));
         }
 
         let mut pinned = pin!(&mut self.file);

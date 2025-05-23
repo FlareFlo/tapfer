@@ -1,5 +1,6 @@
 use crate::UPLOAD_POOL;
 use crate::error::TapferResult;
+use crate::retention_control::delete_asset;
 use crate::updown::upload_pool::UploadFsm;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Redirect};
@@ -8,7 +9,6 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
 use uuid::Uuid;
-use crate::retention_control::delete_asset;
 
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let uuid = Uuid::from_str(&path)?;
@@ -32,7 +32,7 @@ pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl
             Err(e) => {
                 error!("Failed to delete {uuid} from filesystem due to {e}");
             }
-        } 
+        }
     }
 
     Ok(Redirect::to("/"))

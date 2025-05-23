@@ -68,7 +68,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         embed_image_url: &format!("/qrcg/{uuid}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
-        delete_url:  &format!("/uploads/{uuid}/delete"),
+        delete_url: &format!("/uploads/{uuid}/delete"),
     };
 
     Ok(Html(template.render()?))

@@ -70,7 +70,10 @@ impl Drop for UploadHandle {
         // B. The incrementer sees the upload is complete, therefore not needing the handle anymore
         // We check for 2 or less as the map always holds a strong count
         if Arc::strong_count(&self.handle) <= 2 {
-            if matches!(*self.read_fsm_blocking(), UploadFsm::Completed | UploadFsm::Failed) {
+            if matches!(
+                *self.read_fsm_blocking(),
+                UploadFsm::Completed | UploadFsm::Failed
+            ) {
                 // This is hopefully the case, as removing the last (external) handle should only happen when it is completed or aborted
             } else {
                 error!(

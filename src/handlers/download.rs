@@ -1,4 +1,4 @@
-use crate::UPLOAD_POOL;
+use crate::{handlers, UPLOAD_POOL};
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
@@ -9,7 +9,7 @@ use crate::updown::upload_pool::UploadFsm;
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse};
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
@@ -43,7 +43,7 @@ struct DownloadTemplate<'a> {
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, meta), progress_handle) = get_any_meta(&path).await?;
+    let ((uuid, meta), progress_handle) = handlers::get_any_meta(&path).await?;
 
     static DES: &[BorrowedFormatItem<'_>] =
         format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
@@ -74,48 +74,8 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     Ok(Html(template.render()?))
 }
 
-async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), UpDownFsm)> {
-    let uuid = Uuid::from_str(path)?;
-    let res = match fs::try_exists(&format!("data/{uuid}/meta.toml")).await.ok() {
-        // Regular download
-        Some(true) => (
-            FileMeta::read_from_uuid_path(&path).await?,
-            UpDownFsm::Completed,
-        ),
-        // In-progress upload or doesnt exist
-        _ => {
-            let uuid = Uuid::from_str(path)?;
-            match UPLOAD_POOL.uploads.get(&uuid) {
-                // The upload is not in progress either, so it does not exist
-                None => {
-                    return Err(TapferError::Custom {
-                        status_code: StatusCode::NOT_FOUND,
-                        body: Html(NotFound::default().render()?),
-                    });
-                }
-                // The upload is in-progress
-                Some(handle) => {
-                    let fsm = if UPLOAD_POOL.uploads.contains_key(&uuid) {
-                        UpDownFsm::UpdownInProgress {
-                            progress: 0,
-                            handle: handle.clone(),
-                        }
-                    } else {
-                        UpDownFsm::Completed
-                    };
-                    (
-                        (*handle.key(), FileMeta::from_upload_handle(handle.value())),
-                        fsm,
-                    )
-                }
-            }
-        }
-    };
-    Ok(res)
-}
-
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, meta), fsm) = get_any_meta(&path).await?;
+    let ((uuid, meta), fsm) = handlers::get_any_meta(&path).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(

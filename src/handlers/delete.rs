@@ -1,3 +1,4 @@
+use crate::handlers::get_any_meta;
 use crate::UPLOAD_POOL;
 use crate::error::TapferResult;
 use crate::retention_control::delete_asset;
@@ -11,7 +12,7 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let uuid = Uuid::from_str(&path)?;
+    let ((uuid, _), _) = get_any_meta(&path).await?;
     info!("Request to delete {uuid}");
 
     // Ensure the uploader (if present) fails the upload

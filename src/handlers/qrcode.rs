@@ -7,9 +7,10 @@ use qrcode_generator::QrCodeEcc;
 use std::env;
 use std::iter::{once, repeat};
 use uuid::Uuid;
+use crate::handlers::get_any_meta;
 
 pub async fn get_qrcode_from_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let uuid = Uuid::parse_str(&path)?;
+    let ((uuid, _), _) = get_any_meta(&path).await?;
     let qrc = qr_from_uuid(uuid)?;
     Ok(Body::from(qrc))
 }

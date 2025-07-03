@@ -4,6 +4,7 @@ mod file_meta;
 mod handlers;
 mod retention_control;
 mod updown;
+mod case_insensitive_path;
 
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;

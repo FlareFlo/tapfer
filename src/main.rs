@@ -1,27 +1,30 @@
+mod case_insensitive_path;
 mod configuration;
 mod error;
 mod file_meta;
 mod handlers;
 mod retention_control;
 mod updown;
-mod case_insensitive_path;
 
+use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;
 use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::updown::upload_pool::UploadPool;
 use axum::routing::{get_service, post};
-use axum::{Router, extract::DefaultBodyLimit, routing::get};
+use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
 use tokio::time::sleep;
+use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
+use tracing_subscriber::filter::FilterExt;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
 
@@ -57,10 +60,17 @@ async fn main() -> TapferResult<()> {
 
     let static_dir_service = get_service(ServeDir::new("static"));
 
+    let lowercase_router =
+        Router::new().route("/uploads/{uuid}", get(handlers::download::download_html));
+
+    let lowercase_service = ServiceBuilder::new()
+        // We lowercase the path as QR codes will ship them uppercase
+        .layer(middleware::from_fn(lowercase_path_middleware))
+        .service(lowercase_router);
+
     // build our application with some routes
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
-        .route("/uploads/{uuid}", get(handlers::download::download_html))
         .route(
             "/uploads/{uuid}/delete",
             post(handlers::delete::request_delete_asset),
@@ -81,7 +91,8 @@ async fn main() -> TapferResult<()> {
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())
-        .nest_service("/static", static_dir_service);
+        .nest_service("/static", static_dir_service)
+        .fallback_service(lowercase_service);
 
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;

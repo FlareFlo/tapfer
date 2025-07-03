@@ -1,5 +1,6 @@
+use std::array::TryFromSliceError;
 use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
-use crate::error::TapferResult;
+use crate::error::{TapferError, TapferResult};
 use crate::handlers::get_any_meta;
 use axum::body::Body;
 use axum::extract::Path;
@@ -50,8 +51,8 @@ pub fn tiny_qr_from_uuid(uuid: Uuid) -> TapferResult<String> {
     let s = top_border
         .chunks(2)
         .map(|e| TryInto::<&[Vec<bool>; 2]>::try_into(e))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
+        // Not the best idea alright, but it avoids allocations
+        .filter_map(Result::ok)
         .map(|[top, bottom]| {
             once((&false, &false)) // Left border
                 .chain(top.iter().zip(bottom))

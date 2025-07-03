@@ -205,7 +205,7 @@
 			// a hack ensuring the backend registered the uuid token and;
 			// a measure to protect the backend from getting a request with tiny payloads that complete instantly
 			// Only fire token request when one second of upload has passed
-            if ((Date.now - sent) < 1000) {return;};
+            if ((Date.now() - sent) < 1000) {return;};
 
             const token_xhr = new XMLHttpRequest();
             token_xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);

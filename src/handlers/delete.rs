@@ -5,11 +5,9 @@ use crate::retention_control::delete_asset;
 use crate::updown::upload_pool::UploadFsm;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Redirect};
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
-use uuid::Uuid;
 
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((uuid, _), _) = get_any_meta(&path).await?;

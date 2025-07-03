@@ -32,19 +32,19 @@ impl UploadPool {
 
 impl UploadHandle {
     #[allow(dead_code)]
-    pub async fn read_fsm(&self) -> RwLockReadGuard<UploadFsm> {
+    pub async fn read_fsm(&self) -> RwLockReadGuard<'_, UploadFsm> {
         self.handle.read().await
     }
 
-    pub async fn write_fsm(&self) -> RwLockWriteGuard<UploadFsm> {
+    pub async fn write_fsm(&self) -> RwLockWriteGuard<'_, UploadFsm> {
         self.handle.write().await
     }
 
-    pub fn read_fsm_blocking(&self) -> RwLockReadGuard<UploadFsm> {
+    pub fn read_fsm_blocking(&self) -> RwLockReadGuard<'_, UploadFsm> {
         block_in_place(|| self.handle.blocking_read())
     }
 
-    pub fn write_fsm_blocking(&self) -> RwLockWriteGuard<UploadFsm> {
+    pub fn write_fsm_blocking(&self) -> RwLockWriteGuard<'_, UploadFsm> {
         block_in_place(|| self.handle.blocking_write())
     }
 

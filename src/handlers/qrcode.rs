@@ -1,6 +1,6 @@
-use std::array::TryFromSliceError;
+use crate::tapfer_id::TapferId;
 use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
-use crate::error::{TapferError, TapferResult};
+use crate::error::{TapferResult};
 use crate::handlers::get_any_meta;
 use axum::body::Body;
 use axum::extract::Path;
@@ -8,26 +8,25 @@ use axum::response::IntoResponse;
 use qrcode_generator::QrCodeEcc;
 use std::env;
 use std::iter::{once, repeat};
-use uuid::Uuid;
 
-pub async fn get_qrcode_from_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, _), _) = get_any_meta(&path).await?;
-    let qrc = qr_from_uuid(uuid)?;
+pub async fn get_qrcode_from_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+    let ((id, _), _) = get_any_meta(&path).await?;
+    let qrc = qr_from_id(id)?;
     Ok(Body::from(qrc))
 }
 
 pub async fn get_placeholder_qrcode() -> TapferResult<impl IntoResponse> {
-    // Just any funny looking UUID, it doesn't really matter
-    let qrc = qr_from_uuid(Uuid::new_v4())?;
+    // Just any funny looking ID, it doesn't really matter
+    let qrc = qr_from_id(TapferId::new_random())?;
     Ok(Body::from(qrc))
 }
 
-fn qr_from_uuid(uuid: Uuid) -> TapferResult<Vec<u8>> {
+fn qr_from_id(id: TapferId) -> TapferResult<Vec<u8>> {
     let host = env::var("HOST").expect("Should ok as main checks this var already");
     let qrc = qrcode_generator::to_png_to_vec_from_str(
         // Uppercase such that this falls into the Alphanumeric encoding for higher efficiency
         // https://en.wikipedia.org/wiki/QR_code
-        format!("{host}/uploads/{uuid}",).to_ascii_uppercase(),
+        format!("{host}/uploads/{id}",).to_ascii_uppercase(),
         QR_CODE_ECC,
         QR_CODE_SIZE,
     )?;
@@ -35,12 +34,12 @@ fn qr_from_uuid(uuid: Uuid) -> TapferResult<Vec<u8>> {
 }
 
 #[allow(dead_code)]
-pub fn tiny_qr_from_uuid(uuid: Uuid) -> TapferResult<String> {
+pub fn tiny_qr_from_id(id: TapferId) -> TapferResult<String> {
     let host = env::var("HOST").expect("Should ok as main checks this var already");
     let mut qrc = qrcode_generator::to_matrix_from_str(
         // Uppercase such that this falls into the Alphanumeric encoding for higher efficiency
         // https://en.wikipedia.org/wiki/QR_code
-        format!("{host}/uploads/{uuid}",).to_ascii_uppercase(),
+        format!("{host}/uploads/{id}",).to_ascii_uppercase(),
         QrCodeEcc::Low,
     )?;
     let full = '█';

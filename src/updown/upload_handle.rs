@@ -6,26 +6,26 @@ use tokio::sync::{Notify, RwLock};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use tokio::task::block_in_place;
 use tracing::error;
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 /// A handle to a running upload
 #[derive(Debug, Clone)]
 pub struct UploadHandle {
     handle: Arc<RwLock<UploadFsm>>,
-    uuid: Uuid,
+    id: TapferId,
     file_meta: FileMeta,
     notify: Arc<Notify>,
 }
 
 impl UploadPool {
-    pub fn handle(&self, uuid: Uuid, file_meta: FileMeta) -> UploadHandle {
+    pub fn handle(&self, id: TapferId, file_meta: FileMeta) -> UploadHandle {
         let handle = UploadHandle {
             handle: Arc::new(RwLock::new(UploadFsm::initial())),
-            uuid,
+            id: id,
             file_meta,
             notify: Arc::new(Notify::new()),
         };
-        self.uploads.insert(uuid, handle.clone());
+        self.uploads.insert(id, handle.clone());
         handle
     }
 }
@@ -78,11 +78,11 @@ impl Drop for UploadHandle {
             } else {
                 error!(
                     "Upload handle {} dropped while it was in progress!",
-                    self.uuid
+                    self.id
                 );
             }
             // Remove it in either case to avoid stale and broken entries
-            UPLOAD_POOL.uploads.remove(&self.uuid);
+            UPLOAD_POOL.uploads.remove(&self.id);
         }
     }
 }

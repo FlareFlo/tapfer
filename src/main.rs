@@ -5,6 +5,7 @@ mod file_meta;
 mod handlers;
 mod retention_control;
 mod updown;
+mod tapfer_id;
 
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -25,9 +26,9 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
-pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, Uuid>> = LazyLock::new(DashMap::new);
+pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(GlobalRetentionPolicy::default);
 pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
@@ -60,7 +61,7 @@ async fn main() -> TapferResult<()> {
     let static_dir_service = get_service(ServeDir::new("static"));
 
     let lowercase_router =
-        Router::new().route("/uploads/{uuid}", get(handlers::download::download_html));
+        Router::new().route("/uploads/{id}", get(handlers::download::download_html));
 
     let lowercase_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase
@@ -71,18 +72,18 @@ async fn main() -> TapferResult<()> {
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route(
-            "/uploads/{uuid}/delete",
+            "/uploads/{id}/delete",
             post(handlers::delete::request_delete_asset),
         )
         .route(
-            "/uploads/query_uuid/{token}",
-            get(handlers::upload::progress_token_to_uuid),
+            "/uploads/query_id/{token}",
+            get(handlers::upload::progress_token_to_id),
         )
         .route(
-            "/uploads/{uuid}/download",
+            "/uploads/{id}/download",
             get(handlers::download::download_file),
         )
-        .route("/qrcg/{uuid}", get(handlers::qrcode::get_qrcode_from_uuid))
+        .route("/qrcg/{id}", get(handlers::qrcode::get_qrcode_from_id))
         .route(
             "/qrcg/placeholder.png",
             get(handlers::qrcode::get_placeholder_qrcode),

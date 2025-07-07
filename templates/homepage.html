@@ -200,15 +200,15 @@
 
         main_xhr.upload.addEventListener('progress', function (e) {
             if (fired) {return;}
-            // Do not send uuid request when less than a megabyte has been transferred
+            // Do not send id request when less than a megabyte has been transferred
 			// This is both:
-			// a hack ensuring the backend registered the uuid token and;
+			// a hack ensuring the backend registered the id token and;
 			// a measure to protect the backend from getting a request with tiny payloads that complete instantly
 			// Only fire token request when one second of upload has passed
             if ((Date.now() - sent) < 1000) {return;};
 
             const token_xhr = new XMLHttpRequest();
-            token_xhr.open('GET', `/uploads/query_uuid/${random_seed}`, true);
+            token_xhr.open('GET', `/uploads/query_id/${random_seed}`, true);
             const qrcode = document.getElementById('qrcode');
 
             token_xhr.onload = async function () {

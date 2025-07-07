@@ -8,7 +8,7 @@ use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
 use tracing::info;
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,
@@ -25,17 +25,17 @@ impl Default for GlobalRetentionPolicy {
 }
 
 pub async fn check_against_global_retention(
-    (uuid, meta): (Uuid, FileMeta),
+    (id, meta): (TapferId, FileMeta),
     now: UtcDateTime,
 ) -> TapferResult<()> {
     if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
-        info!("Deleting {uuid} as it has expired");
-        delete_asset(uuid).await?;
+        info!("Deleting {id} as it has expired");
+        delete_asset(id).await?;
     }
     Ok(())
 }
 
-pub async fn delete_asset(asset: Uuid) -> TapferResult<()> {
+pub async fn delete_asset(asset: TapferId) -> TapferResult<()> {
     fs::remove_dir_all(format!("data/{asset}")).await?;
     Ok(())
 }
@@ -50,13 +50,13 @@ pub async fn check_all_assets() -> TapferResult<()> {
             continue;
         }
 
-        if let Ok(meta) = FileMeta::read_from_uuid_path(&entry.path()).await {
+        if let Ok(meta) = FileMeta::read_from_id_path(&entry.path()).await {
             check_against_global_retention(meta, now).await?;
         } else {
-            let uuid = Uuid::from_str(&entry.path().to_string_lossy())?;
+            let id = TapferId::from_str(&entry.path().to_string_lossy())?;
 
             // Only delete element if it isn't in progress
-            if !UPLOAD_POOL.uploads.contains_key(&uuid) {
+            if !UPLOAD_POOL.uploads.contains_key(&id) {
                 // Delete asset straight up when metadata is missing or corrupt
                 info!(
                     "Deleting {} as its metadata appears corrupt",

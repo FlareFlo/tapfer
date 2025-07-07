@@ -24,7 +24,7 @@ use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 #[derive(Debug)]
 enum RequestSource {
@@ -46,23 +46,23 @@ pub async fn accept_form(
     headers: HeaderMap,
     multipart: Multipart,
 ) -> TapferResult<impl IntoResponse> {
-    let uuid = Uuid::new_v4();
-    fs::create_dir(&format!("data/{uuid}")).await?;
+    let id = TapferId::new_random();
+    fs::create_dir(&format!("data/{id}")).await?;
 
-    info!("Beginning upload of {uuid}");
-    let res = do_upload(&headers, multipart, uuid).await;
+    info!("Beginning upload of {id}");
+    let res = do_upload(&headers, multipart, id).await;
     if res.is_err() {
-        delete_asset(uuid).await?;
+        delete_asset(id).await?;
     }
     res?;
-    info!("Completed upload of {uuid}");
+    info!("Completed upload of {id}");
 
     let source = match headers
         .get("tapfer-source")
         .map(|e| e.to_str())
         .transpose()?
     {
-        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("/uploads/{uuid}"))),
+        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("/uploads/{id}"))),
         _ => {
             let host = env::var("HOST").expect("Should ok as main checks this var already");
             let method = if host.contains("localhost") {
@@ -70,13 +70,13 @@ pub async fn accept_form(
             } else {
                 "https://"
             };
-            RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{uuid}\n")))
+            RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{id}\n")))
         }
     };
     Ok(source)
 }
 
-async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, uuid: Uuid) -> TapferResult<()> {
+async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, id: TapferId) -> TapferResult<()> {
     let mut meta = FileMetaBuilder::default();
 
     let size: Option<u64> = headers
@@ -102,7 +102,7 @@ async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, uuid: Uuid) ->
 
     if let Some(tok) = in_progress_token {
         info!("Adding progress token {tok}");
-        PROGRESS_TOKEN_LUT.insert(tok, uuid);
+        PROGRESS_TOKEN_LUT.insert(tok, id);
     }
     defer! {
         if let Some(t) = in_progress_token {
@@ -119,7 +119,7 @@ async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, uuid: Uuid) ->
         debug!("reading field {name}");
         match name.as_str() {
             "file" => {
-                payload_field(field, uuid, meta.clone(), size).await?;
+                payload_field(field, id, meta.clone(), size).await?;
             }
             _ => {
                 error!("Got unexpected form field {name}");
@@ -134,14 +134,14 @@ async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, uuid: Uuid) ->
 
 async fn payload_field(
     field: Field<'_>,
-    uuid: Uuid,
+    id: TapferId,
     metadata_builder: FileMetaBuilder,
     size: Option<u64>,
 ) -> TapferResult<()> {
     let file_name = field
         .file_name()
         .map(ToOwned::to_owned)
-        .unwrap_or_else(|| uuid.to_string());
+        .unwrap_or_else(|| id.to_string());
     let content_type = field
         .content_type()
         .unwrap_or(mime::APPLICATION_OCTET_STREAM.as_ref())
@@ -149,8 +149,8 @@ async fn payload_field(
 
     let metadata = metadata_builder.build(file_name.clone(), content_type.clone(), size);
     // Only permit updown stream when the files final size was transmitted by the client
-    let handle = UPLOAD_POOL.handle(uuid, metadata.clone());
-    let f = File::create(format!("data/{uuid}/{file_name}")).await?;
+    let handle = UPLOAD_POOL.handle(id, metadata.clone());
+    let f = File::create(format!("data/{id}/{file_name}")).await?;
     let mut f = UpdownWriter::new(f, handle.clone(), metadata, size.is_none());
     let mut s = BufReader::with_capacity(
         UPLOAD_BUFSIZE,
@@ -159,7 +159,7 @@ async fn payload_field(
     copy_buf(&mut s, &mut f).await?;
     let metadata = f.metadata();
     fs::write(
-        format!("data/{uuid}/meta.toml"),
+        format!("data/{id}/meta.toml"),
         toml::to_string_pretty(&metadata)?.as_bytes(),
     )
     .await?;
@@ -189,7 +189,7 @@ async fn expiration_field(
     Ok(())
 }
 
-pub async fn progress_token_to_uuid(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+pub async fn progress_token_to_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let token = u32::from_str(&path)?;
     Ok(PROGRESS_TOKEN_LUT
         .get(&token)

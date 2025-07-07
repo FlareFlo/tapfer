@@ -23,7 +23,7 @@ use tokio::select;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -33,7 +33,7 @@ struct DownloadTemplate<'a> {
     download_url: &'a str,
     mimetype: &'a str,
     filesize: &'a str,
-    uuid: Uuid,
+    id: TapferId,
     embed_image_url: &'a str,
     qr_size: usize,
     embed_description: &'a str,
@@ -41,7 +41,7 @@ struct DownloadTemplate<'a> {
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, meta), progress_handle) = handlers::get_any_meta(&path).await?;
+    let ((id, meta), progress_handle) = handlers::get_any_meta(&path).await?;
 
     static DES: &[BorrowedFormatItem<'_>] =
         format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
@@ -53,7 +53,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
-        download_url: &format!("/uploads/{uuid}/download"),
+        download_url: &format!("/uploads/{id}/download"),
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)
@@ -62,18 +62,18 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         } else {
             &human_bytes(meta.size() as f64)
         },
-        uuid,
-        embed_image_url: &format!("/qrcg/{uuid}"),
+        id: id,
+        embed_image_url: &format!("/qrcg/{id}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
-        delete_url: &format!("/uploads/{uuid}/delete"),
+        delete_url: &format!("/uploads/{id}/delete"),
     };
 
     Ok(Html(template.render()?))
 }
 
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, meta), fsm) = handlers::get_any_meta(&path).await?;
+    let ((id, meta), fsm) = handlers::get_any_meta(&path).await?;
 
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -99,11 +99,11 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
         );
     }
 
-    let path = format!("data/{uuid}/{}", meta.name());
+    let path = format!("data/{id}/{}", meta.name());
     let file = File::open(&path).await?;
     let stream = ReaderStream::with_capacity(file, DOWNLOAD_CHUNKSIZE);
 
-    let wrapped = DownloadStream::new(stream, uuid, meta, fsm);
+    let wrapped = DownloadStream::new(stream, id, meta, fsm);
     Ok((headers, Body::from_stream(wrapped)))
 }
 
@@ -111,7 +111,7 @@ pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoRe
 struct DownloadStream {
     inner: ReaderStream<File>,
     meta: FileMeta,
-    uuid: Uuid,
+    id: TapferId,
     fsm: UpDownFsm,
 }
 
@@ -132,11 +132,11 @@ impl UpDownFsm {
 }
 
 impl DownloadStream {
-    fn new(inner: ReaderStream<File>, uuid: Uuid, meta: FileMeta, fsm: UpDownFsm) -> Self {
+    fn new(inner: ReaderStream<File>, id: TapferId, meta: FileMeta, fsm: UpDownFsm) -> Self {
         Self {
             inner,
             meta,
-            uuid,
+            id: id,
             fsm,
         }
     }
@@ -151,15 +151,15 @@ impl Drop for DownloadStream {
             return;
         }
         let meta = self.meta.clone();
-        let uuid = self.uuid;
+        let id = self.id;
 
         tokio::spawn(async move {
             if meta.remove_after_download() {
-                info!("Removing {uuid} as its download has completed");
-                match delete_asset(uuid).await {
+                info!("Removing {id} as its download has completed");
+                match delete_asset(id).await {
                     Ok(_) => {}
                     Err(e) => {
-                        error!("Failed to delete {uuid} because {e:?}")
+                        error!("Failed to delete {id} because {e:?}")
                     }
                 }
             }

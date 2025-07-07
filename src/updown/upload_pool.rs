@@ -1,12 +1,12 @@
 use crate::error::{TapferError, TapferResult};
 use crate::updown::upload_handle::UploadHandle;
 use dashmap::DashMap;
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 /// A pool of currently running uploads
 #[derive(Debug)]
 pub struct UploadPool {
-    pub uploads: DashMap<Uuid, UploadHandle>,
+    pub uploads: DashMap<TapferId, UploadHandle>,
 }
 
 /// The progress of an upload

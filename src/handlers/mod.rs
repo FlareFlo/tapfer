@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use axum::response::Html;
 use std::str::FromStr;
 use tokio::fs;
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 pub mod delete;
 pub mod download;
@@ -17,18 +17,18 @@ mod not_found;
 pub mod qrcode;
 pub mod upload;
 
-async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), UpDownFsm)> {
-    let uuid = Uuid::from_str(path)?;
-    let res = match fs::try_exists(&format!("data/{uuid}/meta.toml")).await.ok() {
+async fn get_any_meta(path: &String) -> TapferResult<((TapferId, FileMeta), UpDownFsm)> {
+    let id = TapferId::from_str(path)?;
+    let res = match fs::try_exists(&format!("data/{id}/meta.toml")).await.ok() {
         // Regular download
         Some(true) => (
-            FileMeta::read_from_uuid_path(&path).await?,
+            FileMeta::read_from_id_path(&path).await?,
             UpDownFsm::Completed,
         ),
         // In-progress upload or doesnt exist
         _ => {
-            let uuid = Uuid::from_str(path)?;
-            match UPLOAD_POOL.uploads.get(&uuid) {
+            let id = TapferId::from_str(path)?;
+            match UPLOAD_POOL.uploads.get(&id) {
                 // The upload is not in progress either, so it does not exist
                 None => {
                     return Err(TapferError::Custom {
@@ -38,7 +38,7 @@ async fn get_any_meta(path: &String) -> TapferResult<((Uuid, FileMeta), UpDownFs
                 }
                 // The upload is in-progress
                 Some(handle) => {
-                    let fsm = if UPLOAD_POOL.uploads.contains_key(&uuid) {
+                    let fsm = if UPLOAD_POOL.uploads.contains_key(&id) {
                         UpDownFsm::UpdownInProgress {
                             progress: 0,
                             handle: handle.clone(),

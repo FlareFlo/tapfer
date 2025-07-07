@@ -33,7 +33,7 @@ pub enum TapferError {
     #[error("Added size to UploadFsm when it was already {0:?}")]
     UploadHandleSize(UploadFsm),
 
-    #[error("The requested token {0} does not have a matching UUID/upload")]
+    #[error("The requested token {0} does not have a matching ID/upload")]
     TokenDoesNotExist(u32),
 
     #[error("Invalid expiration {0}")]

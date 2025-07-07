@@ -10,26 +10,26 @@ use tokio::time::sleep;
 use tracing::{error, info};
 
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((uuid, _), _) = get_any_meta(&path).await?;
-    info!("Request to delete {uuid}");
+    let ((id, _), _) = get_any_meta(&path).await?;
+    info!("Request to delete {id}");
 
     // Ensure the uploader (if present) fails the upload
-    if let Some(handle) = UPLOAD_POOL.uploads.get(&uuid) {
+    if let Some(handle) = UPLOAD_POOL.uploads.get(&id) {
         let v = handle.value();
         *v.write_fsm().await = UploadFsm::Failed;
         v.notify_all_downloaders();
-        info!("Notified uploader and downloaders that {uuid} is slated for deletion");
+        info!("Notified uploader and downloaders that {id} is slated for deletion");
         // Wait for all downloaders to abort and drop their resources gracefully
         sleep(Duration::from_millis(200)).await;
-        info!("Aborted upload and downloads for {uuid} as requested");
+        info!("Aborted upload and downloads for {id} as requested");
     } else {
-        let r = delete_asset(uuid).await;
+        let r = delete_asset(id).await;
         match r {
             Ok(_) => {
-                info!("Deleted {uuid} as requested");
+                info!("Deleted {id} as requested");
             }
             Err(e) => {
-                error!("Failed to delete {uuid} from filesystem due to {e}");
+                error!("Failed to delete {id} from filesystem due to {e}");
             }
         }
     }

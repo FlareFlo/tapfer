@@ -3,7 +3,7 @@ use crate::updown::upload_handle::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
 use time::{Duration, UtcDateTime};
-use uuid::Uuid;
+use crate::tapfer_id::TapferId;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FileMeta {
@@ -56,15 +56,15 @@ impl FileMeta {
         matches!(self.removal_policy, RemovalPolicy::SingleDownload)
     }
 
-    pub async fn read_from_uuid_path(path: impl AsRef<Path>) -> TapferResult<(Uuid, Self)> {
-        let uuid = Uuid::from_str(&path.as_ref().to_string_lossy())?;
-        let meta: FileMeta = Self::read_from_uuid(uuid).await?;
-        Ok((uuid, meta))
+    pub async fn read_from_id_path(path: impl AsRef<Path>) -> TapferResult<(TapferId, Self)> {
+        let id = TapferId::from_str(&path.as_ref().to_string_lossy())?;
+        let meta: FileMeta = Self::read_from_id(id).await?;
+        Ok((id, meta))
     }
 
-    pub async fn read_from_uuid(uuid: Uuid) -> TapferResult<Self> {
+    pub async fn read_from_id(id: TapferId) -> TapferResult<Self> {
         Ok(toml::from_str(
-            &tokio::fs::read_to_string(format!("data/{uuid}/meta.toml")).await?,
+            &tokio::fs::read_to_string(format!("data/{id}/meta.toml")).await?,
         )?)
     }
 

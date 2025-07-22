@@ -23,6 +23,7 @@ use tokio::select;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
+use crate::handlers::qrcode::base64_qr_from_id;
 use crate::tapfer_id::TapferId;
 
 #[derive(Template)]
@@ -33,11 +34,11 @@ struct DownloadTemplate<'a> {
     download_url: &'a str,
     mimetype: &'a str,
     filesize: &'a str,
-    id: TapferId,
     embed_image_url: &'a str,
     qr_size: usize,
     embed_description: &'a str,
     delete_url: &'a str,
+    qr_b64: String,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
@@ -62,11 +63,11 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         } else {
             &human_bytes(meta.size() as f64)
         },
-        id: id,
         embed_image_url: &format!("/qrcg/{id}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
         delete_url: &format!("/uploads/{id}/delete"),
+        qr_b64: base64_qr_from_id(id)?,
     };
 
     Ok(Html(template.render()?))

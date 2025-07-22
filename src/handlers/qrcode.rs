@@ -8,18 +8,8 @@ use axum::response::IntoResponse;
 use qrcode_generator::QrCodeEcc;
 use std::env;
 use std::iter::{once, repeat};
-
-pub async fn get_qrcode_from_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let ((id, _), _) = get_any_meta(&path).await?;
-    let qrc = qr_from_id(id)?;
-    Ok(Body::from(qrc))
-}
-
-pub async fn get_placeholder_qrcode() -> TapferResult<impl IntoResponse> {
-    // Just any funny looking ID, it doesn't really matter
-    let qrc = qr_from_id(TapferId::new_random())?;
-    Ok(Body::from(qrc))
-}
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 
 fn qr_from_id(id: TapferId) -> TapferResult<Vec<u8>> {
     let host = env::var("HOST").expect("Should ok as main checks this var already");
@@ -31,6 +21,15 @@ fn qr_from_id(id: TapferId) -> TapferResult<Vec<u8>> {
         QR_CODE_SIZE,
     )?;
     Ok(qrc)
+}
+
+pub fn base64_qr_from_id(id: TapferId) -> TapferResult<String> {
+    let data = qr_from_id(id)?;
+    Ok(BASE64_STANDARD.encode(&data))
+}
+
+pub fn random_base64_qr_from_id() -> TapferResult<String> {
+    base64_qr_from_id(TapferId::new_random())
 }
 
 #[allow(dead_code)]
@@ -71,4 +70,20 @@ pub fn tiny_qr_from_id(id: TapferId) -> TapferResult<String> {
         .chain(once(repeat(full).take(top_border.len() + 1).collect())) // Bottom border
         .collect();
     Ok(s)
+}
+
+#[allow(dead_code)]
+#[deprecated(note = "Use base64 inline QR codes")]
+pub async fn get_qrcode_from_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+    let ((id, _), _) = get_any_meta(&path).await?;
+    let qrc = qr_from_id(id)?;
+    Ok(Body::from(qrc))
+}
+
+#[allow(dead_code)]
+#[deprecated(note = "Use base64 inline QR codes")]
+pub async fn get_placeholder_qrcode() -> TapferResult<impl IntoResponse> {
+    // Just any funny looking ID, it doesn't really matter
+    let qrc = qr_from_id(TapferId::new_random())?;
+    Ok(Body::from(qrc))
 }

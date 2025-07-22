@@ -88,7 +88,7 @@
 				<a id="download_url" href="unset" target="_blank" class="show_on_upload">Download URL</a>
 				<button id="copy_link_button" class="show_on_upload">Copy to clipboard</button>
 			</div>
-			<img rel="preload" id="qrcode" src="/qrcg/placeholder.png" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
+			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 		</div>
 	</div>
 </section>

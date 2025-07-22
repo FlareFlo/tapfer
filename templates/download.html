@@ -28,7 +28,7 @@
 				<button type="submit" id="delete_button">Delete</button>
 			</form>
 		</div>
-		<img src="/qrcg/{{ id }}", width=" {{qr_size}} px", height=" {{qr_size }} px">
+		<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 	</div>
 </div>
 </body>

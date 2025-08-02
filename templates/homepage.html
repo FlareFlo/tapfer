@@ -64,12 +64,21 @@
 			<div>
 				Drop file anywhere or <a id="filelink" href="javascript:document.getElementById('file_input').click();">select a file</a>
 			</div>
+
 			<form id="uploadForm">
-				<label for="expiration" style="display: none">Remove after </label>
-				<select name="expiration" id="expiration" style="display: none">
-					<option value="single_download" selected="selected">one download</option>
-					<option value="24_hours">24 hours</option>
-				</select>
+				<div style="display: flex; align-items: center; gap: 0.5rem;">
+					<p style="margin: 0;">Delete after:</p>
+
+					<label>
+						<input type="radio" name="expiration" value="single_download" id="del_1download" checked>
+						one download
+					</label>
+
+					<label>
+						<input type="radio" name="expiration" value="24_hours" id="del_24hours">
+						24 hours
+					</label>
+				</div>
 
 				<label>
 					<input style="display: none" id="file_input" type="file" name="file" required>

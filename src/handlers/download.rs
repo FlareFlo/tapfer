@@ -45,7 +45,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let ((id, meta), progress_handle) = handlers::get_any_meta(&path).await?;
 
     static DES: &[BorrowedFormatItem<'_>] =
-        format_description!("[hour]:[minute] [week_number]-[week_number]-[year]");
+        format_description!("[hour]:[minute] [day]-[month]-[year]");
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
         RemovalPolicy::Expiry { .. } => meta.expires_on().unwrap().format(&DES)?.to_string(),

@@ -2,6 +2,7 @@ use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::retention_control::delete_asset;
+use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL};
@@ -24,7 +25,6 @@ use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
-use crate::tapfer_id::TapferId;
 
 #[derive(Debug)]
 enum RequestSource {
@@ -76,21 +76,27 @@ pub async fn accept_form(
     Ok(source)
 }
 
-async fn do_upload(headers: &HeaderMap, mut multipart: Multipart, id: TapferId) -> TapferResult<()> {
+async fn do_upload(
+    headers: &HeaderMap,
+    mut multipart: Multipart,
+    id: TapferId,
+) -> TapferResult<()> {
     let mut meta = FileMetaBuilder::default();
 
-    let size: Option<u64> = headers
-        .get("tapfer-file-size")
-        .map(|h| h.to_str())
-        .transpose()?
+    let header = |header: &str| headers.get(header).map(|h| h.to_str()).transpose();
+
+    let size: Option<u64> = header("tapfer-file-size")?
         .map(|h| h.parse::<u64>())
         .transpose()?;
-    let in_progress_token: Option<u32> = headers
-        .get("tapfer-progress-token")
-        .map(|h| h.to_str())
-        .transpose()?
+    let in_progress_token: Option<u32> = header("tapfer-progress-token")?
         .map(|h| h.parse())
         .transpose()?;
+
+    if let Some(tz) = header("tapfer-timezone")? {
+        meta.timezone = Some(tz.to_owned());
+    } else {
+        error!("Missing tapfer-timezone header");
+    }
 
     if size.is_some() != in_progress_token.is_some() {
         warn!(

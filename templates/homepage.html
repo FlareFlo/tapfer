@@ -169,6 +169,7 @@
         main_xhr.setRequestHeader("tapfer-progress-token", random_seed.toString());
         main_xhr.setRequestHeader("tapfer-expiration", formData.get("expiration"));
         main_xhr.setRequestHeader("tapfer-source", "frontend");
+        main_xhr.setRequestHeader("tapfer-timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
 
         background.style.backgroundSize = '0% 100%';
 

@@ -1,15 +1,15 @@
-use crate::tapfer_id::TapferId;
 use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
-use crate::error::{TapferResult};
+use crate::error::TapferResult;
 use crate::handlers::get_any_meta;
+use crate::tapfer_id::TapferId;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::response::IntoResponse;
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use qrcode_generator::QrCodeEcc;
 use std::env;
 use std::iter::{once, repeat};
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
 
 fn qr_from_id(id: TapferId) -> TapferResult<Vec<u8>> {
     let host = env::var("HOST").expect("Should ok as main checks this var already");

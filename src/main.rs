@@ -4,14 +4,15 @@ mod error;
 mod file_meta;
 mod handlers;
 mod retention_control;
-mod updown;
 mod tapfer_id;
+mod updown;
 
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;
 use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
+use crate::tapfer_id::TapferId;
 use crate::updown::upload_pool::UploadPool;
 use axum::routing::{get_service, post};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
@@ -26,7 +27,6 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use crate::tapfer_id::TapferId;
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =

@@ -1,7 +1,7 @@
 use crate::error::{TapferError, TapferResult};
+use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use dashmap::DashMap;
-use crate::tapfer_id::TapferId;
 
 /// A pool of currently running uploads
 #[derive(Debug)]

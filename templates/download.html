@@ -17,8 +17,23 @@
 		<div class="file-info">
 			<p><strong>Filename:</strong> {{filename}}</p>
 			<p><strong>MIME Type:</strong> {{mimetype}}</p>
-			<p><strong>Expires:</strong> {{expiry}}</p>
+			<p id="expiry">><strong>Expires:</strong> {{expiry}}</p>
 			<p><strong>Size:</strong> {{filesize}}</p>
+			<script>
+				const realtime = {{ unix_expiry}};
+				const date = new Date(realtime * 1000);
+                const pad = (n) => n.toString().padStart(2, '0');
+
+                const hours = pad(date.getHours());
+                const minutes = pad(date.getMinutes());
+                const day = pad(date.getDate());
+                const month = pad(date.getMonth() + 1); // Months are zero-based
+                const year = date.getFullYear();
+
+                const formatted = `${hours}:${minutes} ${day}-${month}-${year}`;
+
+                document.getElementById('expiry').innerHTML = `<strong>Expires:</strong> ${formatted}`;
+			</script>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<form action="{{download_url}}" method="get">

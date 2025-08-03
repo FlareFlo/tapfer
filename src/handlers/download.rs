@@ -2,7 +2,9 @@ use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers;
+use crate::handlers::qrcode::base64_qr_from_id;
 use crate::retention_control::delete_asset;
+use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use askama::Template;
@@ -23,8 +25,6 @@ use tokio::select;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
-use crate::handlers::qrcode::base64_qr_from_id;
-use crate::tapfer_id::TapferId;
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -39,6 +39,7 @@ struct DownloadTemplate<'a> {
     embed_description: &'a str,
     delete_url: &'a str,
     qr_b64: String,
+    unix_expiry: i64,
 }
 
 pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
@@ -48,7 +49,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         format_description!("[hour]:[minute] [day]-[month]-[year]");
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
-        RemovalPolicy::Expiry { .. } => meta.expires_on().unwrap().format(&DES)?.to_string(),
+        RemovalPolicy::Expiry { .. } => meta.expires_on_utc().unwrap().format(&DES)?.to_string(),
     };
 
     let template = DownloadTemplate {
@@ -68,6 +69,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         embed_description: EMBED_DESCRIPTION,
         delete_url: &format!("/uploads/{id}/delete"),
         qr_b64: base64_qr_from_id(id)?,
+        unix_expiry: meta.expires_on_utc().unwrap().unix_timestamp(),
     };
 
     Ok(Html(template.render()?))

@@ -1,12 +1,12 @@
 use crate::UPLOAD_POOL;
 use crate::file_meta::FileMeta;
+use crate::tapfer_id::TapferId;
 use crate::updown::upload_pool::{UploadFsm, UploadPool};
 use std::sync::Arc;
 use tokio::sync::{Notify, RwLock};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 use tokio::task::block_in_place;
 use tracing::error;
-use crate::tapfer_id::TapferId;
 
 /// A handle to a running upload
 #[derive(Debug, Clone)]

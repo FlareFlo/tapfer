@@ -1,9 +1,11 @@
 use crate::error::{TapferError, TapferResult};
+use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
-use time::{Duration, UtcDateTime};
-use crate::tapfer_id::TapferId;
+use time::{Duration, OffsetDateTime, UtcDateTime};
+use time_tz::{OffsetDateTimeExt, PrimitiveDateTimeExt, timezones};
+use tracing::error;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FileMeta {
@@ -48,10 +50,6 @@ impl FileSize {
     }
 }
 impl FileMeta {
-    pub fn _default_policy(name: String, mimetype: String, known_size: Option<u64>) -> Self {
-        FileMetaBuilder::default().build(name, mimetype, known_size)
-    }
-
     pub fn remove_after_download(&self) -> bool {
         matches!(self.removal_policy, RemovalPolicy::SingleDownload)
     }
@@ -97,7 +95,7 @@ impl FileMeta {
         }
     }
 
-    pub fn expires_on(&self) -> Option<UtcDateTime> {
+    pub fn expires_on_utc(&self) -> Option<UtcDateTime> {
         match self.removal_policy {
             RemovalPolicy::SingleDownload => None,
             RemovalPolicy::Expiry { after } => Some(self.created + after),
@@ -108,19 +106,28 @@ impl FileMeta {
 #[derive(Debug, Clone, Default)]
 pub struct FileMetaBuilder {
     pub expiration: Option<RemovalPolicy>,
+    pub timezone: Option<String>,
 }
 
 impl FileMetaBuilder {
     pub fn build(self, name: String, mimetype: String, known_size: Option<u64>) -> FileMeta {
         FileMeta {
-            name,
             size: if let Some(s) = known_size {
                 FileSize::AlreadyKnown(s)
             } else {
                 FileSize::Dynamic(0)
             },
-            created: UtcDateTime::now(),
+            created: self
+                .timezone
+                .map(|tz| timezones::get_by_name(&tz))
+                .flatten()
+                .map(|tz| OffsetDateTime::now_utc().to_timezone(tz).to_utc())
+                .unwrap_or_else(|| {
+                    error!("No TZ zet for {}", name);
+                    UtcDateTime::now()
+                }),
             removal_policy: self.expiration.unwrap_or(RemovalPolicy::SingleDownload),
+            name,
             mimetype,
         }
     }

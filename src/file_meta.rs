@@ -4,7 +4,7 @@ use crate::updown::upload_handle::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
 use time::{Duration, OffsetDateTime, UtcDateTime};
-use time_tz::{OffsetDateTimeExt, PrimitiveDateTimeExt, timezones};
+use time_tz::{OffsetDateTimeExt, timezones};
 use tracing::error;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

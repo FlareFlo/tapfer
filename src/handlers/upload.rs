@@ -41,6 +41,13 @@ impl IntoResponse for RequestSource {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/",
+    responses(
+        (status = 200, description = "Upload file "),
+    )
+)]
 #[axum::debug_handler]
 pub async fn accept_form(
     headers: HeaderMap,

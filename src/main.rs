@@ -1,3 +1,4 @@
+mod api_doc;
 mod case_insensitive_path;
 mod configuration;
 mod error;
@@ -7,6 +8,7 @@ mod retention_control;
 mod tapfer_id;
 mod updown;
 
+use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;
@@ -27,6 +29,8 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable};
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
@@ -87,6 +91,7 @@ async fn main() -> TapferResult<()> {
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/static", static_dir_service)
+        .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
         .fallback_service(lowercase_service);
 
     // run it with hyper

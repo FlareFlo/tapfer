@@ -9,6 +9,15 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info};
 
+#[utoipa::path(
+    get,
+    path = "/uploads/{id}/delete",
+    responses(
+        (status = 303, description = "Asset deleted, redirects to home page"),
+        (status = 404, description = "Asset does not exist"),
+    ),
+
+)]
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((id, _), _) = get_any_meta(&path).await?;
     info!("Request to delete {id}");

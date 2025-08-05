@@ -44,9 +44,17 @@ impl IntoResponse for RequestSource {
 #[utoipa::path(
     post,
     path = "/",
+    params(
+        ("tapfer-source" = Option<String>, Header, description = "`frontend` when using frontend, unset otherwise"),
+        ("tapfer-file-size" = Option<u64>, Header, description = "optional file size of asset"),
+        ("tapfer-progress-token" = Option<u32>, Header, description = "random ID to associate upload with frontend"),
+        ("tapfer-timezone" = Option<String>, Header, description = "client timezone in IANA string format, UTC otherwise"),
+        ("tapfer-expiration" = Option<String>, Header, description = "Expiration either as `single_download` or `24_hours`"),
+    ),
     responses(
-        (status = 200, description = "Upload file "),
-    )
+        (status = 303, description = "Page to asset when using frontend"),
+        (status = 200, description = "URL to asset when using CURL or similar"),
+    ),
 )]
 #[axum::debug_handler]
 pub async fn accept_form(
@@ -202,6 +210,15 @@ async fn expiration_field(
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/uploads/query_id}/{token}",
+    responses(
+        (status = 200, description = "UUID of asset"),
+        (status = 404, description = "Token matches no (running) asset"),
+    ),
+
+)]
 pub async fn progress_token_to_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let token = u32::from_str(&path)?;
     Ok(PROGRESS_TOKEN_LUT

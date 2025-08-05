@@ -75,6 +75,21 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     Ok(Html(template.render()?))
 }
 
+#[utoipa::path(
+    get,
+    path = "/uploads/{id}/download",
+    responses(
+        (status = 200, description = "Returns asset", headers
+            (
+                ("content-disposition" = String, description = "File name"),
+                ("content-type" = String, description = "File mime type"),
+                ("content-length" = Option<u64>, description = "Size of asset"),
+            )
+        ),
+        (status = 404, description = "Asset does not exist"),
+    ),
+
+)]
 pub async fn download_file(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((id, meta), fsm) = handlers::get_any_meta(&path).await?;
 

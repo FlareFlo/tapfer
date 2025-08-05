@@ -94,7 +94,8 @@
 
 			<div id="progress_text" class="show_on_upload">0MB/0MB 0MB/s</div>
 			<div>
-				<a id="download_url" href="unset" target="_blank" class="show_on_upload">Download URL</a>
+<!--				Padded to UUID string length-->
+				<a id="download_url" href="unset" target="_blank" class="show_on_upload">Download URL                        </a>
 				<button id="copy_link_button" class="show_on_upload">Copy to clipboard</button>
 			</div>
 			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">

@@ -72,8 +72,14 @@ pub fn tiny_qr_from_id(id: TapferId) -> TapferResult<String> {
     Ok(s)
 }
 
-#[allow(dead_code)]
-#[deprecated(note = "Use base64 inline QR codes")]
+#[utoipa::path(
+    get,
+    path = "/qrcg/{id}",
+    responses(
+        (status = 200, description = "Returns QR code"),
+        (status = 404, description = "Asset does not exist"),
+    ),
+)]
 pub async fn get_qrcode_from_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((id, _), _) = get_any_meta(&path).await?;
     let qrc = qr_from_id(id)?;

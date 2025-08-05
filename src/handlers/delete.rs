@@ -16,7 +16,6 @@ use tracing::{error, info};
         (status = 303, description = "Asset deleted, redirects to home page"),
         (status = 404, description = "Asset does not exist"),
     ),
-
 )]
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((id, _), _) = get_any_meta(&path).await?;

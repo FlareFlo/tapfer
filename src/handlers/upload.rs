@@ -212,7 +212,7 @@ async fn expiration_field(
 
 #[utoipa::path(
     get,
-    path = "/uploads/query_id}/{token}",
+    path = "/uploads/query_id/{token}",
     responses(
         (status = 200, description = "UUID of asset"),
         (status = 404, description = "Token matches no (running) asset"),

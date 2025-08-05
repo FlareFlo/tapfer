@@ -87,6 +87,10 @@ async fn main() -> TapferResult<()> {
             "/uploads/{id}/download",
             get(handlers::download::download_file),
         )
+        .route(
+            "/qrcg/{id}",
+            get(handlers::qrcode::get_qrcode_from_id)
+        )
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())

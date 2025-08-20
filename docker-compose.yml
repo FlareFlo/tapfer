@@ -1,7 +1,5 @@
 services:
   webserver:
-    environment:
-      HOST: ""
     build:
       context: .
       dockerfile: Dockerfile

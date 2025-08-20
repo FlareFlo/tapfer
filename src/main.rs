@@ -39,12 +39,6 @@ pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
-    if env::var("HOST").is_err() {
-        panic!(
-            "Please set the environment variable HOST containing the domain tapfer is served on"
-        );
-    }
-
     ctrlc::set_handler(move || {
         error!("Caught CTRL-C... Exiting right away");
         std::process::exit(1);

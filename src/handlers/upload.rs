@@ -1,3 +1,4 @@
+use axum_extra::extract::Host;
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
@@ -14,7 +15,6 @@ use axum::response::Html;
 use axum::response::{IntoResponse, Redirect, Response};
 use futures_util::TryStreamExt;
 use scopeguard::defer;
-use std::env;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
@@ -59,6 +59,7 @@ impl IntoResponse for RequestSource {
 #[axum::debug_handler]
 pub async fn accept_form(
     headers: HeaderMap,
+    Host(host): Host,
     multipart: Multipart,
 ) -> TapferResult<impl IntoResponse> {
     let id = TapferId::new_random();
@@ -79,7 +80,6 @@ pub async fn accept_form(
     {
         Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("/uploads/{id}"))),
         _ => {
-            let host = env::var("HOST").expect("Should ok as main checks this var already");
             let method = if host.contains("localhost") {
                 ""
             } else {

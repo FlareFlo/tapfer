@@ -1,3 +1,4 @@
+use axum_extra::extract::Host;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
@@ -42,7 +43,7 @@ struct DownloadTemplate<'a> {
     unix_expiry: i64,
 }
 
-pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+pub async fn download_html(Path(path): Path<String>, Host(host): Host) -> TapferResult<impl IntoResponse> {
     let ((id, meta), progress_handle) = handlers::get_any_meta(&path).await?;
 
     static DES: &[BorrowedFormatItem<'_>] =
@@ -68,7 +69,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
         delete_url: &format!("/uploads/{id}/delete"),
-        qr_b64: base64_qr_from_id(id)?,
+        qr_b64: base64_qr_from_id(id, &host)?,
         unix_expiry: meta
             .expires_on_utc()
             .map(|e| e.unix_timestamp())

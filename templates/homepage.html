@@ -161,7 +161,7 @@
         const main_xhr = new XMLHttpRequest();
         let cdnUrl = window.location.origin;
         if (window.location.hostname !== 'localhost') {
-            cdnUrl = "cdn." + window.location.origin;
+            cdnUrl = cdnUrl.replace(window.location.hostname, "cdn." + window.location.hostname);
 		}
         main_xhr.open('POST', cdnUrl + '/', true);
 

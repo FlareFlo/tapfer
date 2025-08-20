@@ -159,7 +159,12 @@
 
         // Prepare our POST
         const main_xhr = new XMLHttpRequest();
-        main_xhr.open('POST', '/', true);
+        let cdnUrl = window.location.origin;
+        console.log(window.location.hostname);
+        if (window.location.hostname !== 'localhost') {
+            cdnUrl = "cdn." + window.location.origin;
+		}
+        main_xhr.open('POST', cdnUrl + '/', true);
 
         // Set all form fields as headers
         const fileInput = form.querySelector('input[name="file"]');

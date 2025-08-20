@@ -1,3 +1,4 @@
+use crate::error::TapferError;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use uuid::Uuid;
@@ -16,7 +17,7 @@ impl TapferId {
 }
 
 impl FromStr for TapferId {
-    type Err = uuid::Error;
+    type Err = TapferError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self {

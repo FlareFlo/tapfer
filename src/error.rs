@@ -100,7 +100,11 @@ impl IntoResponse for TapferError {
             ParseIntError(_) => generic("parse int error"),
             ToStrError(_) => generic("to str error"),
             AddSizeToAlreadyKnown => generic("add size to already known"),
-            TokenDoesNotExist(id) => (StatusCode::NOT_FOUND, format!("Upload token {id} not associated with any asset")).into_response(),
+            TokenDoesNotExist(id) => (
+                StatusCode::NOT_FOUND,
+                format!("Upload token {id} not associated with any asset"),
+            )
+                .into_response(),
             QRCodeError(_) => generic("qr code generation"),
             InvalidExpiration(s) => generic(&format!("invalid expiration: {s}")),
             TimeFormat(_) => generic("time format"),

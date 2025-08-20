@@ -8,7 +8,7 @@ use std::str::FromStr;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
-use tracing::info;
+use tracing::{error, info};
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,
@@ -53,7 +53,10 @@ pub async fn check_all_assets() -> TapferResult<()> {
         if let Ok(meta) = FileMeta::read_from_id_path(&entry.path()).await {
             check_against_global_retention(meta, now).await?;
         } else {
-            let id = TapferId::from_str(&entry.path().to_string_lossy())?;
+            let id = TapferId::from_str(&entry.path().to_string_lossy()).map_err(|e| {
+                error!("Failed to check asset {entry:?}");
+                e
+            })?;
 
             // Only delete element if it isn't in progress
             if !UPLOAD_POOL.uploads.contains_key(&id) {

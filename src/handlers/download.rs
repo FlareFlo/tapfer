@@ -69,7 +69,10 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         embed_description: EMBED_DESCRIPTION,
         delete_url: &format!("/uploads/{id}/delete"),
         qr_b64: base64_qr_from_id(id)?,
-        unix_expiry: meta.expires_on_utc().map(|e|e.unix_timestamp()).unwrap_or(0),
+        unix_expiry: meta
+            .expires_on_utc()
+            .map(|e| e.unix_timestamp())
+            .unwrap_or(0),
     };
 
     Ok(Html(template.render()?))

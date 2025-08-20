@@ -87,10 +87,7 @@ async fn main() -> TapferResult<()> {
             "/uploads/{id}/download",
             get(handlers::download::download_file),
         )
-        .route(
-            "/qrcg/{id}",
-            get(handlers::qrcode::get_qrcode_from_id)
-        )
+        .route("/qrcg/{id}", get(handlers::qrcode::get_qrcode_from_id))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())
@@ -104,9 +101,12 @@ async fn main() -> TapferResult<()> {
 
     tokio::spawn(async {
         loop {
-            // TODO: Handle errors
+            // TODO: Handle errors in a better way
             info!("Checking for stale assets");
-            check_all_assets().await.unwrap();
+            let e = check_all_assets().await;
+            if e.is_err() {
+                error!("Checking assets failed: {:?}", e);
+            }
 
             sleep(Duration::from_secs_f64(
                 GLOBAL_RETENTION_POLICY.recheck_interval.as_seconds_f64(),

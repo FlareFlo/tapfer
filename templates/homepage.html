@@ -160,7 +160,6 @@
         // Prepare our POST
         const main_xhr = new XMLHttpRequest();
         let cdnUrl = window.location.origin;
-        console.log(window.location.hostname);
         if (window.location.hostname !== 'localhost') {
             cdnUrl = "cdn." + window.location.origin;
 		}

@@ -105,19 +105,17 @@
 {% include "footer.html" %}
 <script>
 	// All id elements
-    const copylink = document.getElementById("copy_link_button");
-    const downloadURL = document.getElementById("download_url");
+    const copylink_button = document.getElementById("copy_link_button");
+    const download_url = document.getElementById("download_url");
     const progresstext = document.getElementById("progress_text");
     const background = document.getElementById('uploadBox');
     const percentageElement = document.getElementById('blurred-percentage');
     const form = document.getElementById('uploadForm');
     const fileinput = document.getElementById("file_input");
 
-    copylink.addEventListener("click", () => {
-        if (copylink.href === "") {
-            navigator.clipboard.writeText(downloadURL.href);
-            copylink.innerText = "Copied!";
-		}
+    copylink_button.addEventListener("click", () => {
+		navigator.clipboard.writeText(download_url.href);
+		copylink_button.innerText = "Copied!";
 	});
 
     // Prevent default actions
@@ -141,8 +139,8 @@
     })
 
 	// Prevent opening when it's not ready yet
-    downloadURL.addEventListener("click", (e) => {
-        if (downloadURL.href.endsWith("unset")) {
+    download_url.addEventListener("click", (e) => {
+        if (download_url.href.endsWith("unset")) {
             e.preventDefault();
 		}
 	})
@@ -225,8 +223,8 @@
             token_xhr.onload = async function () {
                 if (token_xhr.status >= 200 && token_xhr.status < 300) {
                     const url = `/uploads/${token_xhr.responseText}`;
-                    downloadURL.href = url;
-                    downloadURL.innerText = token_xhr.responseText;
+                    download_url.href = url;
+                    download_url.innerText = token_xhr.responseText;
 
                     qrcode.src = `/qrcg/${token_xhr.responseText}`;
                     qrcode.style.filter = 'none';

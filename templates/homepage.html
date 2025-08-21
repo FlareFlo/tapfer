@@ -250,6 +250,7 @@
         main_xhr.onload = function () {
             // Follow redirect to upload location
             if (main_xhr.status >= 200 && main_xhr.status < 300) {
+                console.log(`redirecting to ${main_xhr.responseText}`);
                 window.location.href = main_xhr.responseText;
             } else {
                 alert('Upload failed.');

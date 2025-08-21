@@ -8,6 +8,8 @@ mod retention_control;
 mod tapfer_id;
 mod updown;
 
+use tower_http::cors::AllowOrigin;
+use tower_http::cors::CorsLayer;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -23,6 +25,7 @@ use handlers::homepage;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
+use http::{HeaderValue, Method};
 use tokio::time::sleep;
 use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -58,6 +61,10 @@ async fn main() -> TapferResult<()> {
 
     let static_dir_service = get_service(ServeDir::new("static"));
 
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_origin(AllowOrigin::list([HeaderValue::from_str("https://tapfer.lkl.lol").unwrap(), HeaderValue::from_str("https://cdn.tapfer.lkl.lol").unwrap()]));
+
     let lowercase_router =
         Router::new().route("/uploads/{id}", get(handlers::download::download_html));
 
@@ -87,6 +94,7 @@ async fn main() -> TapferResult<()> {
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/static", static_dir_service)
         .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
+        .layer(cors)
         .fallback_service(lowercase_service);
 
     // run it with hyper

@@ -75,18 +75,18 @@ pub async fn accept_form(
 
     dbg!(&host);
 
+    let method = if host.contains("localhost") {
+        ""
+    } else {
+        "https://"
+    };
     let source = match headers
         .get("tapfer-source")
         .map(|e| e.to_str())
         .transpose()?
     {
-        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("/uploads/{id}"))),
+        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("{method}{host}/uploads/{id}"))),
         _ => {
-            let method = if host.contains("localhost") {
-                ""
-            } else {
-                "https://"
-            };
             RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{id}\n")))
         }
     };

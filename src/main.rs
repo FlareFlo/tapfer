@@ -42,10 +42,6 @@ pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(GlobalRetentionPolicy::default);
 pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 
-async fn handle_options<B>(_req: Request<B>) -> impl IntoResponse {
-    (axum::http::StatusCode::NO_CONTENT, "")
-}
-
 #[tokio::main]
 async fn main() -> TapferResult<()> {
     ctrlc::set_handler(move || {
@@ -73,7 +69,7 @@ async fn main() -> TapferResult<()> {
 
     let lowercase_router =
         Router::new()
-            .route("/uploads/{id}", get(handlers::download::download_html).options(handle_options));
+            .route("/uploads/{id}", get(handlers::download::download_html));
 
     let fallback_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase
@@ -101,8 +97,8 @@ async fn main() -> TapferResult<()> {
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/static", static_dir_service)
         .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
-        .layer(cors)
-        .fallback_service(fallback_service);
+        .fallback_service(fallback_service)
+        .layer(cors);
 
     let main_service = ServiceBuilder::new()
         .service(app);

@@ -73,6 +73,8 @@ pub async fn accept_form(
     res?;
     info!("Completed upload of {id}");
 
+    dbg!(&host);
+
     let source = match headers
         .get("tapfer-source")
         .map(|e| e.to_str())

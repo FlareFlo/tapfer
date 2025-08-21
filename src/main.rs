@@ -25,9 +25,11 @@ use handlers::homepage;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
-use http::{HeaderValue, Method, StatusCode};
+use axum::extract::Request;
+use axum::response::IntoResponse;
+use http::{HeaderValue, Method};
 use tokio::time::sleep;
-use tower::ServiceBuilder;
+use tower::{ServiceBuilder};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
@@ -39,6 +41,10 @@ pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(GlobalRetentionPolicy::default);
 pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
+
+async fn handle_options<B>(_req: Request<B>) -> impl IntoResponse {
+    (axum::http::StatusCode::NO_CONTENT, "")
+}
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
@@ -67,11 +73,7 @@ async fn main() -> TapferResult<()> {
 
     let lowercase_router =
         Router::new()
-            // Little hacky, this ensures the backend responds to OPTIONS
-            .fallback(axum::routing::options(|| async {
-                StatusCode::NO_CONTENT
-            }))
-            .route("/uploads/{id}", get(handlers::download::download_html));
+            .route("/uploads/{id}", get(handlers::download::download_html).options(handle_options));
 
     let fallback_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase
@@ -102,6 +104,9 @@ async fn main() -> TapferResult<()> {
         .layer(cors)
         .fallback_service(fallback_service);
 
+    let main_service = ServiceBuilder::new()
+        .service(app);
+
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
     tracing::debug!("listening on {}", listener.local_addr()?);
@@ -122,7 +127,7 @@ async fn main() -> TapferResult<()> {
         }
     });
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, main_service).await?;
     Ok(())
 }
 

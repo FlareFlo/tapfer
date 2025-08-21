@@ -250,7 +250,7 @@
         main_xhr.onload = function () {
             // Follow redirect to upload location
             if (main_xhr.status >= 200 && main_xhr.status < 300) {
-                window.location.href = main_xhr.responseURL;
+                window.location.href = main_xhr.responseText;
             } else {
                 alert('Upload failed.');
                 background.style.backgroundSize = '0% 100%';

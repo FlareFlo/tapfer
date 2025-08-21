@@ -47,8 +47,7 @@ pub struct UploadParameters {
         ("expiration" = Option<String>, description = "Expiration either as `single_download` or `24_hours`"),
     ),
     responses(
-        (status = 303, description = "Page to asset when using frontend"),
-        (status = 200, description = "URL to asset when using CURL or similar"),
+        (status = 200, description = "URL to asset page"),
     ),
 )]
 #[axum::debug_handler]

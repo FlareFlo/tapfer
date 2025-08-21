@@ -19,6 +19,7 @@ use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::task::{Context, Poll};
+use http::HeaderValue;
 use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
@@ -44,10 +45,20 @@ enum RequestSource {
 
 impl IntoResponse for RequestSource {
     fn into_response(self) -> Response {
-        match self {
+        let mut r = match self {
             RequestSource::Frontend(r) => r.into_response(),
             RequestSource::Unknown(b) => Response::new(b),
-        }
+        };
+        r.headers_mut().insert( "Access-Control-Allow-Origin", HeaderValue::from_static("https://tapfer.lkl.lol"));
+        r.headers_mut().insert(
+            "Access-Control-Allow-Methods",
+            HeaderValue::from_static("GET, POST, OPTIONS"),
+        );
+        r.headers_mut().insert(
+            "Access-Control-Allow-Headers",
+            HeaderValue::from_static("Content-Type, Authorization"),
+        );
+        r
     }
 }
 

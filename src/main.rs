@@ -8,7 +8,7 @@ mod retention_control;
 mod tapfer_id;
 mod updown;
 
-use tower_http::cors::AllowOrigin;
+use tower_http::cors::{AllowOrigin, Any};
 use tower_http::cors::CorsLayer;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
@@ -25,9 +25,7 @@ use handlers::homepage;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
-use axum::extract::Request;
-use axum::response::IntoResponse;
-use http::{HeaderValue, Method};
+use http::{HeaderValue};
 use tokio::time::sleep;
 use tower::{ServiceBuilder};
 use tower_http::limit::RequestBodyLimitLayer;
@@ -64,7 +62,7 @@ async fn main() -> TapferResult<()> {
     let static_dir_service = get_service(ServeDir::new("static"));
 
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_methods(Any)
         .allow_origin(AllowOrigin::list([HeaderValue::from_static("https://tapfer.lkl.lol"), HeaderValue::from_static("https://cdn.tapfer.lkl.lol")]));
 
     let lowercase_router =

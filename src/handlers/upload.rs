@@ -59,7 +59,7 @@ impl IntoResponse for RequestSource {
 #[axum::debug_handler]
 pub async fn accept_form(
     headers: HeaderMap,
-    Host(host): Host,
+    Host(mut host): Host,
     multipart: Multipart,
 ) -> TapferResult<impl IntoResponse> {
     let id = TapferId::new_random();
@@ -73,7 +73,7 @@ pub async fn accept_form(
     res?;
     info!("Completed upload of {id}");
 
-    dbg!(&host);
+    host = host.replace("cdn.", "");
 
     let method = if host.contains("localhost") {
         ""

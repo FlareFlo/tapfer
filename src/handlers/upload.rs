@@ -1,4 +1,3 @@
-use axum_extra::extract::Host;
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
@@ -9,9 +8,10 @@ use crate::updown::upload_pool::UploadFsm;
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL};
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query};
-use axum::http::{StatusCode};
+use axum::http::StatusCode;
 use axum::response::Html;
-use axum::response::{IntoResponse};
+use axum::response::IntoResponse;
+use axum_extra::extract::Host;
 use futures_util::TryStreamExt;
 use scopeguard::defer;
 use std::io::Error;
@@ -24,7 +24,6 @@ use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
-
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
@@ -65,7 +64,6 @@ pub async fn accept_form(
     res?;
     info!("Completed upload of {id}");
 
-
     let method = if host.contains("localhost") {
         host = "".to_owned();
         ""
@@ -84,7 +82,9 @@ async fn do_upload(
     let mut meta = FileMetaBuilder::default();
 
     let size: Option<u64> = params.file_size;
-    let in_progress_token: Option<u32> = params.progress_token.as_ref()
+    let in_progress_token: Option<u32> = params
+        .progress_token
+        .as_ref()
         .map(|h| h.parse())
         .transpose()?;
 
@@ -170,10 +170,7 @@ async fn payload_field(
     Ok(())
 }
 
-async fn expiration_field(
-    field: Option<&str>,
-    meta: &mut FileMetaBuilder,
-) -> TapferResult<()> {
+async fn expiration_field(field: Option<&str>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
     let Some(f) = field else {
         return Ok(());
     };

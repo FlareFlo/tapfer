@@ -8,8 +8,6 @@ mod retention_control;
 mod tapfer_id;
 mod updown;
 
-use tower_http::cors::{AllowOrigin, Any};
-use tower_http::cors::CorsLayer;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -22,12 +20,14 @@ use axum::routing::{get_service, post};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
+use http::HeaderValue;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
-use http::{HeaderValue};
 use tokio::time::sleep;
-use tower::{ServiceBuilder};
+use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, Any};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
@@ -63,12 +63,14 @@ async fn main() -> TapferResult<()> {
 
     let cors = CorsLayer::new()
         .allow_methods(Any)
-        .allow_origin(AllowOrigin::list([HeaderValue::from_static("https://tapfer.lkl.lol"), HeaderValue::from_static("https://cdn.tapfer.lkl.lol")]));
+        .allow_origin(AllowOrigin::list([
+            HeaderValue::from_static("https://tapfer.lkl.lol"),
+            HeaderValue::from_static("https://cdn.tapfer.lkl.lol"),
+        ]));
 
-    let lowercase_router =
-        Router::new()
-            .route("/uploads/{id}", get(handlers::download::download_html))
-            .layer(cors.clone());
+    let lowercase_router = Router::new()
+        .route("/uploads/{id}", get(handlers::download::download_html))
+        .layer(cors.clone());
 
     let fallback_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase
@@ -99,8 +101,7 @@ async fn main() -> TapferResult<()> {
         .fallback_service(fallback_service)
         .layer(cors);
 
-    let main_service = ServiceBuilder::new()
-        .service(app);
+    let main_service = ServiceBuilder::new().service(app);
 
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;

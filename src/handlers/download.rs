@@ -1,4 +1,3 @@
-use axum_extra::extract::Host;
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
@@ -13,6 +12,7 @@ use axum::body::Body;
 use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse};
+use axum_extra::extract::Host;
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
 use std::io;
@@ -43,7 +43,10 @@ struct DownloadTemplate<'a> {
     unix_expiry: i64,
 }
 
-pub async fn download_html(Path(path): Path<String>, Host(host): Host) -> TapferResult<impl IntoResponse> {
+pub async fn download_html(
+    Path(path): Path<String>,
+    Host(host): Host,
+) -> TapferResult<impl IntoResponse> {
     let ((id, meta), progress_handle) = handlers::get_any_meta(&path).await?;
 
     static DES: &[BorrowedFormatItem<'_>] =

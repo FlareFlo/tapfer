@@ -20,11 +20,14 @@ use axum::routing::{get_service, post};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
+use http::HeaderValue;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
 use tokio::time::sleep;
 use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, Any};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
@@ -39,12 +42,6 @@ pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 
 #[tokio::main]
 async fn main() -> TapferResult<()> {
-    if env::var("HOST").is_err() {
-        panic!(
-            "Please set the environment variable HOST containing the domain tapfer is served on"
-        );
-    }
-
     ctrlc::set_handler(move || {
         error!("Caught CTRL-C... Exiting right away");
         std::process::exit(1);
@@ -64,10 +61,18 @@ async fn main() -> TapferResult<()> {
 
     let static_dir_service = get_service(ServeDir::new("static"));
 
-    let lowercase_router =
-        Router::new().route("/uploads/{id}", get(handlers::download::download_html));
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_origin(AllowOrigin::list([
+            HeaderValue::from_static("https://tapfer.lkl.lol"),
+            HeaderValue::from_static("https://cdn.tapfer.lkl.lol"),
+        ]));
 
-    let lowercase_service = ServiceBuilder::new()
+    let lowercase_router = Router::new()
+        .route("/uploads/{id}", get(handlers::download::download_html))
+        .layer(cors.clone());
+
+    let fallback_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase
         .layer(middleware::from_fn(lowercase_path_middleware))
         .service(lowercase_router);
@@ -93,7 +98,10 @@ async fn main() -> TapferResult<()> {
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/static", static_dir_service)
         .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
-        .fallback_service(lowercase_service);
+        .fallback_service(fallback_service)
+        .layer(cors);
+
+    let main_service = ServiceBuilder::new().service(app);
 
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
@@ -115,7 +123,7 @@ async fn main() -> TapferResult<()> {
         }
     });
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, main_service).await?;
     Ok(())
 }
 

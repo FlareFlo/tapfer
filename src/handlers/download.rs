@@ -12,6 +12,7 @@ use axum::body::Body;
 use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse};
+use axum_extra::extract::Host;
 use futures_util::StreamExt;
 use human_bytes::human_bytes;
 use std::io;
@@ -42,7 +43,10 @@ struct DownloadTemplate<'a> {
     unix_expiry: i64,
 }
 
-pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+pub async fn download_html(
+    Path(path): Path<String>,
+    Host(host): Host,
+) -> TapferResult<impl IntoResponse> {
     let ((id, meta), progress_handle) = handlers::get_any_meta(&path).await?;
 
     static DES: &[BorrowedFormatItem<'_>] =
@@ -55,7 +59,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
-        download_url: &format!("/uploads/{id}/download"),
+        download_url: &format!("https://cdn.{host}/uploads/{id}/download"),
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)
@@ -68,7 +72,7 @@ pub async fn download_html(Path(path): Path<String>) -> TapferResult<impl IntoRe
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
         delete_url: &format!("/uploads/{id}/delete"),
-        qr_b64: base64_qr_from_id(id)?,
+        qr_b64: base64_qr_from_id(id, &host)?,
         unix_expiry: meta
             .expires_on_utc()
             .map(|e| e.unix_timestamp())
@@ -157,7 +161,7 @@ impl DownloadStream {
         Self {
             inner,
             meta,
-            id: id,
+            id,
             fsm,
         }
     }

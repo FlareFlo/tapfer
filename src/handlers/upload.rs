@@ -6,15 +6,14 @@ use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL};
-use axum::body::Body;
 use axum::extract::multipart::Field;
-use axum::extract::{Multipart, Path};
-use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::extract::{Multipart, Path, Query};
+use axum::http::StatusCode;
 use axum::response::Html;
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::IntoResponse;
+use axum_extra::extract::Host;
 use futures_util::TryStreamExt;
 use scopeguard::defer;
-use std::env;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
@@ -26,91 +25,73 @@ use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
 
-#[derive(Debug)]
-enum RequestSource {
-    Frontend(Redirect),
-    Unknown(Body),
-}
-
-impl IntoResponse for RequestSource {
-    fn into_response(self) -> Response {
-        match self {
-            RequestSource::Frontend(r) => r.into_response(),
-            RequestSource::Unknown(b) => Response::new(b),
-        }
-    }
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct UploadParameters {
+    file_size: Option<u64>,
+    progress_token: Option<String>,
+    expiration: Option<String>,
+    timezone: Option<String>,
 }
 
 #[utoipa::path(
     post,
     path = "/",
     params(
-        ("tapfer-source" = Option<String>, Header, description = "`frontend` when using frontend, unset otherwise"),
-        ("tapfer-file-size" = Option<u64>, Header, description = "optional file size of asset"),
-        ("tapfer-progress-token" = Option<u32>, Header, description = "random ID to associate upload with frontend"),
-        ("tapfer-timezone" = Option<String>, Header, description = "client timezone in IANA string format, UTC otherwise"),
-        ("tapfer-expiration" = Option<String>, Header, description = "Expiration either as `single_download` or `24_hours`"),
+        ("source" = Option<String>, description = "`frontend` when using frontend, unset otherwise"),
+        ("file_size" = Option<u64>, description = "optional file size of asset"),
+        ("progress_token" = Option<u32>, description = "random ID to associate upload with frontend"),
+        ("timezone" = Option<String>, description = "client timezone in IANA string format, UTC otherwise"),
+        ("expiration" = Option<String>, description = "Expiration either as `single_download` or `24_hours`"),
     ),
     responses(
-        (status = 303, description = "Page to asset when using frontend"),
-        (status = 200, description = "URL to asset when using CURL or similar"),
+        (status = 200, description = "URL to asset page"),
     ),
 )]
 #[axum::debug_handler]
 pub async fn accept_form(
-    headers: HeaderMap,
+    Host(mut host): Host,
+    Query(params): Query<UploadParameters>,
     multipart: Multipart,
 ) -> TapferResult<impl IntoResponse> {
     let id = TapferId::new_random();
     fs::create_dir(&format!("data/{id}")).await?;
 
     info!("Beginning upload of {id}");
-    let res = do_upload(&headers, multipart, id).await;
+    let res = do_upload(multipart, id, &params).await;
     if res.is_err() {
         delete_asset(id).await?;
     }
     res?;
     info!("Completed upload of {id}");
 
-    let source = match headers
-        .get("tapfer-source")
-        .map(|e| e.to_str())
-        .transpose()?
-    {
-        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("/uploads/{id}"))),
-        _ => {
-            let host = env::var("HOST").expect("Should ok as main checks this var already");
-            let method = if host.contains("localhost") {
-                ""
-            } else {
-                "https://"
-            };
-            RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{id}\n")))
-        }
+    let method = if host.contains("localhost") {
+        host = "".to_owned();
+        ""
+    } else {
+        host = host.replace("cdn.", "");
+        "https://"
     };
-    Ok(source)
+    Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}")))
 }
 
 async fn do_upload(
-    headers: &HeaderMap,
     mut multipart: Multipart,
     id: TapferId,
+    params: &UploadParameters,
 ) -> TapferResult<()> {
     let mut meta = FileMetaBuilder::default();
 
-    let header = |header: &str| headers.get(header).map(|h| h.to_str()).transpose();
-
-    let size: Option<u64> = header("tapfer-file-size")?
-        .map(|h| h.parse::<u64>())
-        .transpose()?;
-    let in_progress_token: Option<u32> = header("tapfer-progress-token")?
+    let size: Option<u64> = params.file_size;
+    let in_progress_token: Option<u32> = params
+        .progress_token
+        .as_ref()
         .map(|h| h.parse())
         .transpose()?;
 
-    if let Some(tz) = header("tapfer-timezone")? {
+    if let Some(tz) = params.timezone.as_ref() {
         meta.timezone = Some(tz.to_owned());
     } else {
-        error!("Missing tapfer-timezone header");
+        error!("Missing tapfer-timezone parameter");
     }
 
     if size.is_some() != in_progress_token.is_some() {
@@ -119,7 +100,7 @@ async fn do_upload(
         );
     }
 
-    expiration_field(headers.get("tapfer-expiration"), &mut meta).await?;
+    expiration_field(params.expiration.as_deref(), &mut meta).await?;
 
     if let Some(tok) = in_progress_token {
         info!("Adding progress token {tok}");
@@ -189,11 +170,8 @@ async fn payload_field(
     Ok(())
 }
 
-async fn expiration_field(
-    field: Option<&HeaderValue>,
-    meta: &mut FileMetaBuilder,
-) -> TapferResult<()> {
-    let Some(f) = field.map(|f| f.to_str()).transpose()? else {
+async fn expiration_field(field: Option<&str>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
+    let Some(f) = field else {
         return Ok(());
     };
     match f {

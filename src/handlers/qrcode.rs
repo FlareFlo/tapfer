@@ -5,14 +5,13 @@ use crate::tapfer_id::TapferId;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::response::IntoResponse;
+use axum_extra::extract::Host;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use qrcode_generator::QrCodeEcc;
-use std::env;
 use std::iter::{once, repeat};
 
-fn qr_from_id(id: TapferId) -> TapferResult<Vec<u8>> {
-    let host = env::var("HOST").expect("Should ok as main checks this var already");
+fn qr_from_id(id: TapferId, host: &str) -> TapferResult<Vec<u8>> {
     let qrc = qrcode_generator::to_png_to_vec_from_str(
         // Uppercase such that this falls into the Alphanumeric encoding for higher efficiency
         // https://en.wikipedia.org/wiki/QR_code
@@ -23,18 +22,17 @@ fn qr_from_id(id: TapferId) -> TapferResult<Vec<u8>> {
     Ok(qrc)
 }
 
-pub fn base64_qr_from_id(id: TapferId) -> TapferResult<String> {
-    let data = qr_from_id(id)?;
+pub fn base64_qr_from_id(id: TapferId, host: &str) -> TapferResult<String> {
+    let data = qr_from_id(id, host)?;
     Ok(BASE64_STANDARD.encode(&data))
 }
 
-pub fn random_base64_qr_from_id() -> TapferResult<String> {
-    base64_qr_from_id(TapferId::new_random())
+pub fn random_base64_qr_from_id(host: &str) -> TapferResult<String> {
+    base64_qr_from_id(TapferId::new_random(), &host)
 }
 
 #[allow(dead_code)]
-pub fn tiny_qr_from_id(id: TapferId) -> TapferResult<String> {
-    let host = env::var("HOST").expect("Should ok as main checks this var already");
+pub fn tiny_qr_from_id(id: TapferId, host: &str) -> TapferResult<String> {
     let mut qrc = qrcode_generator::to_matrix_from_str(
         // Uppercase such that this falls into the Alphanumeric encoding for higher efficiency
         // https://en.wikipedia.org/wiki/QR_code
@@ -80,16 +78,11 @@ pub fn tiny_qr_from_id(id: TapferId) -> TapferResult<String> {
         (status = 404, description = "Asset does not exist"),
     ),
 )]
-pub async fn get_qrcode_from_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
+pub async fn get_qrcode_from_id(
+    Path(path): Path<String>,
+    Host(host): Host,
+) -> TapferResult<impl IntoResponse> {
     let ((id, _), _) = get_any_meta(&path).await?;
-    let qrc = qr_from_id(id)?;
-    Ok(Body::from(qrc))
-}
-
-#[allow(dead_code)]
-#[deprecated(note = "Use base64 inline QR codes")]
-pub async fn get_placeholder_qrcode() -> TapferResult<impl IntoResponse> {
-    // Just any funny looking ID, it doesn't really matter
-    let qrc = qr_from_id(TapferId::new_random())?;
+    let qrc = qr_from_id(id, &host)?;
     Ok(Body::from(qrc))
 }

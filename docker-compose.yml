@@ -1,7 +1,5 @@
 services:
   webserver:
-    environment:
-      HOST: ""
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,4 +7,5 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/usr/src/app/data
+      - ./target:/usr/src/app/target
     restart: unless-stopped

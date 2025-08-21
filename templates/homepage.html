@@ -159,16 +159,26 @@
 
         // Prepare our POST
         const main_xhr = new XMLHttpRequest();
-        main_xhr.open('POST', '/', true);
+        let cdnUrl = window.location.origin;
+        if (window.location.hostname !== 'localhost') {
+            cdnUrl = cdnUrl.replace(window.location.hostname, "cdn." + window.location.hostname);
+		} else {
+            console.log("Localhost mode, not using CDN url");
+		}
 
         // Set all form fields as headers
         const fileInput = form.querySelector('input[name="file"]');
         const file = fileInput.files[0];
-        main_xhr.setRequestHeader("tapfer-file-size", file.size);
-        main_xhr.setRequestHeader("tapfer-progress-token", random_seed.toString());
-        main_xhr.setRequestHeader("tapfer-expiration", formData.get("expiration"));
-        main_xhr.setRequestHeader("tapfer-source", "frontend");
-        main_xhr.setRequestHeader("tapfer-timezone", Intl.DateTimeFormat().resolvedOptions().timeZone);
+
+        const params = new URLSearchParams({
+            "file_size": file.size,
+            "progress_token": random_seed.toString(),
+            "expiration": formData.get("expiration"),
+            "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+
+        main_xhr.open('POST', `${cdnUrl}/?${params.toString()}`, true);
+
 
         background.style.backgroundSize = '0% 100%';
 
@@ -239,7 +249,8 @@
         main_xhr.onload = function () {
             // Follow redirect to upload location
             if (main_xhr.status >= 200 && main_xhr.status < 300) {
-                window.location.href = main_xhr.responseURL;
+                console.log(`redirecting to ${main_xhr.responseText}`);
+                window.location.href = main_xhr.responseText;
             } else {
                 alert('Upload failed.');
                 background.style.backgroundSize = '0% 100%';

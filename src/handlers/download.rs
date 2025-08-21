@@ -56,7 +56,7 @@ pub async fn download_html(Path(path): Path<String>, Host(host): Host) -> Tapfer
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
-        download_url: &format!("cdn.{host}/uploads/{id}/download"),
+        download_url: &format!("https://cdn.{host}/uploads/{id}/download"),
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)

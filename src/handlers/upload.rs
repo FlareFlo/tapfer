@@ -12,14 +12,13 @@ use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query};
 use axum::http::{StatusCode};
 use axum::response::Html;
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::{IntoResponse};
 use futures_util::TryStreamExt;
 use scopeguard::defer;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
 use std::task::{Context, Poll};
-use http::HeaderValue;
 use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
@@ -37,40 +36,15 @@ pub struct UploadParameters {
     timezone: Option<String>,
 }
 
-#[derive(Debug)]
-enum RequestSource {
-    Frontend(Redirect),
-    Unknown(Body),
-}
-
-impl IntoResponse for RequestSource {
-    fn into_response(self) -> Response {
-        let mut r = match self {
-            RequestSource::Frontend(r) => r.into_response(),
-            RequestSource::Unknown(b) => Response::new(b),
-        };
-        r.headers_mut().insert( "Access-Control-Allow-Origin", HeaderValue::from_static("https://tapfer.lkl.lol"));
-        r.headers_mut().insert(
-            "Access-Control-Allow-Methods",
-            HeaderValue::from_static("GET, POST, OPTIONS"),
-        );
-        r.headers_mut().insert(
-            "Access-Control-Allow-Headers",
-            HeaderValue::from_static("Content-Type, Authorization"),
-        );
-        r
-    }
-}
-
 #[utoipa::path(
     post,
     path = "/",
     params(
-        ("tapfer-source" = Option<String>, Header, description = "`frontend` when using frontend, unset otherwise"),
-        ("tapfer-file-size" = Option<u64>, Header, description = "optional file size of asset"),
-        ("tapfer-progress-token" = Option<u32>, Header, description = "random ID to associate upload with frontend"),
-        ("tapfer-timezone" = Option<String>, Header, description = "client timezone in IANA string format, UTC otherwise"),
-        ("tapfer-expiration" = Option<String>, Header, description = "Expiration either as `single_download` or `24_hours`"),
+        ("source" = Option<String>, description = "`frontend` when using frontend, unset otherwise"),
+        ("file_size" = Option<u64>, description = "optional file size of asset"),
+        ("progress_token" = Option<u32>, description = "random ID to associate upload with frontend"),
+        ("timezone" = Option<String>, description = "client timezone in IANA string format, UTC otherwise"),
+        ("expiration" = Option<String>, description = "Expiration either as `single_download` or `24_hours`"),
     ),
     responses(
         (status = 303, description = "Page to asset when using frontend"),
@@ -102,14 +76,7 @@ pub async fn accept_form(
         host = host.replace("cdn.", "");
         "https://"
     };
-    let source = match params.source.as_deref()
-    {
-        Some("frontend") => RequestSource::Frontend(Redirect::to(&format!("{method}{host}/uploads/{id}"))),
-        _ => {
-            RequestSource::Unknown(Body::new(format!("{method}{host}/uploads/{id}\n")))
-        }
-    };
-    Ok(source)
+    Ok(Body::new(format!("{method}{host}/uploads/{id}")))
 }
 
 async fn do_upload(

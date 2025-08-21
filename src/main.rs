@@ -69,7 +69,8 @@ async fn main() -> TapferResult<()> {
 
     let lowercase_router =
         Router::new()
-            .route("/uploads/{id}", get(handlers::download::download_html));
+            .route("/uploads/{id}", get(handlers::download::download_html))
+            .layer(cors.clone());
 
     let fallback_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase

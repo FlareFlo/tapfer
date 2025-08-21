@@ -25,7 +25,7 @@ use handlers::homepage;
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
-use http::{HeaderValue, Method};
+use http::{HeaderValue, Method, StatusCode};
 use tokio::time::sleep;
 use tower::ServiceBuilder;
 use tower_http::limit::RequestBodyLimitLayer;
@@ -63,12 +63,17 @@ async fn main() -> TapferResult<()> {
 
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_origin(AllowOrigin::list([HeaderValue::from_str("https://tapfer.lkl.lol").unwrap(), HeaderValue::from_str("https://cdn.tapfer.lkl.lol").unwrap()]));
+        .allow_origin(AllowOrigin::list([HeaderValue::from_static("https://tapfer.lkl.lol"), HeaderValue::from_static("https://cdn.tapfer.lkl.lol")]));
 
     let lowercase_router =
-        Router::new().route("/uploads/{id}", get(handlers::download::download_html));
+        Router::new()
+            // Little hacky, this ensures the backend responds to OPTIONS
+            .fallback(axum::routing::options(|| async {
+                StatusCode::NO_CONTENT
+            }))
+            .route("/uploads/{id}", get(handlers::download::download_html));
 
-    let lowercase_service = ServiceBuilder::new()
+    let fallback_service = ServiceBuilder::new()
         // We lowercase the path as QR codes will ship them uppercase
         .layer(middleware::from_fn(lowercase_path_middleware))
         .service(lowercase_router);
@@ -95,7 +100,7 @@ async fn main() -> TapferResult<()> {
         .nest_service("/static", static_dir_service)
         .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
         .layer(cors)
-        .fallback_service(lowercase_service);
+        .fallback_service(fallback_service);
 
     // run it with hyper
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;

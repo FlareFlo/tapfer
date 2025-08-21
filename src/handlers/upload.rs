@@ -7,7 +7,6 @@ use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL};
-use axum::body::Body;
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query};
 use axum::http::{StatusCode};
@@ -32,7 +31,6 @@ pub struct UploadParameters {
     file_size: Option<u64>,
     progress_token: Option<String>,
     expiration: Option<String>,
-    source: Option<String>,
     timezone: Option<String>,
 }
 

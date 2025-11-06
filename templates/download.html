@@ -9,6 +9,10 @@
 		#delete_button {
 			background: crimson;
 		}
+		#copy_link {
+			background: green;
+			width: 215px;
+		}
 	</style>
 </head>
 <body>
@@ -19,32 +23,13 @@
 			<p><strong>MIME Type:</strong> {{mimetype}}</p>
 			<p id="expiry"><strong>Expires:</strong> {{expiry}}</p>
 			<p><strong>Size:</strong> {{filesize}}</p>
-			<script>
-				function main() {
-                    // Do not parse, as the server will set the expiry string properly
-                    const realtime = {{ unix_expiry}};
-                    if (realtime == 0) {
-                        return;
-                    }
-                    const date = new Date(realtime * 1000);
-                    const pad = (n) => n.toString().padStart(2, '0');
-
-                    const hours = pad(date.getHours());
-                    const minutes = pad(date.getMinutes());
-                    const day = pad(date.getDate());
-                    const month = pad(date.getMonth() + 1); // Months are zero-based
-                    const year = date.getFullYear();
-
-                    const formatted = `${hours}:${minutes} ${day}-${month}-${year}`;
-
-                    document.getElementById('expiry').innerHTML = `<strong>Expires:</strong> ${formatted}`;
-				}
-                main()
-			</script>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<form action="{{download_url}}" method="get">
 				<button type="submit">Download</button>
+			</form>
+			<form>
+				<button id="copy_link" type="button">Copy direct download link</button>
 			</form>
 			<form action="{{delete_url}}" method="post">
 				<button type="submit" id="delete_button">Delete</button>
@@ -53,5 +38,38 @@
 		<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 	</div>
 </div>
+
+<script>
+	const copy_link = document.getElementById('copy_link');
+	copy_link.addEventListener('click', async () => {
+		try {
+			await navigator.clipboard.writeText("{{download_url}}");
+			copy_link.innerText = "Copied!";
+		} catch (err) {
+			console.error('Failed to copy: ', err);
+		}
+	});
+
+	function main() {
+		// Do not parse, as the server will set the expiry string properly
+		const realtime = {{ unix_expiry}};
+		if (realtime == 0) {
+			return;
+		}
+		const date = new Date(realtime * 1000);
+		const pad = (n) => n.toString().padStart(2, '0');
+
+		const hours = pad(date.getHours());
+		const minutes = pad(date.getMinutes());
+		const day = pad(date.getDate());
+		const month = pad(date.getMonth() + 1); // Months are zero-based
+		const year = date.getFullYear();
+
+		const formatted = `${hours}:${minutes} ${day}-${month}-${year}`;
+
+		document.getElementById('expiry').innerHTML = `<strong>Expires:</strong> ${formatted}`;
+	}
+	main()
+</script>
 </body>
 </html>

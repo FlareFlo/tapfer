@@ -15,7 +15,7 @@ fn qr_from_id(id: TapferId, host: &str) -> TapferResult<Vec<u8>> {
     let qrc = qrcode_generator::to_png_to_vec_from_str(
         // Uppercase such that this falls into the Alphanumeric encoding for higher efficiency
         // https://en.wikipedia.org/wiki/QR_code
-        format!("{host}/uploads/{id}",).to_ascii_uppercase(),
+        format!("https://{host}/uploads/{id}",).to_ascii_uppercase(),
         QR_CODE_ECC,
         QR_CODE_SIZE,
     )?;

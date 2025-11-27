@@ -31,9 +31,7 @@
 			<form>
 				<button id="copy_link" type="button">Copy direct download link</button>
 			</form>
-			<form action="{{delete_url}}" method="post">
-				<button type="submit" id="delete_button">Delete</button>
-			</form>
+			<button id="delete_button">Delete</button>
 		</div>
 		<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
 	</div>
@@ -48,6 +46,16 @@
 		} catch (err) {
 			console.error('Failed to copy: ', err);
 		}
+	});
+
+    const delete_button = document.getElementById("delete_button");
+    delete_button.addEventListener('click', async () => {
+        await fetch("{{delete_url}}", {method: 'DELETE'}).then(res => {
+            console.log(res);
+            if (res.ok && res.redirected) {
+                window.location.href = res.url;
+			}
+		});
 	});
 
 	function main() {

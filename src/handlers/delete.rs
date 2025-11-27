@@ -11,7 +11,7 @@ use tracing::{error, info};
 
 #[utoipa::path(
     get,
-    path = "/uploads/{id}/delete",
+    path = "/uploads/{id}",
     responses(
         (status = 303, description = "Asset deleted, redirects to home page"),
         (status = 404, description = "Asset does not exist"),

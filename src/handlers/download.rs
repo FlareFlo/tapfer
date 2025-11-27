@@ -71,7 +71,7 @@ pub async fn download_html(
         embed_image_url: &format!("/qrcg/{id}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
-        delete_url: &format!("/uploads/{id}/delete"),
+        delete_url: &format!("/uploads/{id}"),
         qr_b64: base64_qr_from_id(id, &host)?,
         unix_expiry: meta
             .expires_on_utc()

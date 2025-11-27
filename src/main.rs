@@ -16,7 +16,7 @@ use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::tapfer_id::TapferId;
 use crate::updown::upload_pool::UploadPool;
-use axum::routing::{get_service, post};
+use axum::routing::{get_service};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
@@ -69,7 +69,7 @@ async fn main() -> TapferResult<()> {
         ]));
 
     let lowercase_router = Router::new()
-        .route("/uploads/{id}", get(handlers::download::download_html))
+        .route("/uploads/{id}", get(handlers::download::download_html).delete(handlers::delete::request_delete_asset))
         .layer(cors.clone());
 
     let fallback_service = ServiceBuilder::new()
@@ -80,10 +80,6 @@ async fn main() -> TapferResult<()> {
     // build our application with some routes
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
-        .route(
-            "/uploads/{id}/delete",
-            post(handlers::delete::request_delete_asset),
-        )
         .route(
             "/uploads/query_id/{token}",
             get(handlers::upload::progress_token_to_id),

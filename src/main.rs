@@ -7,6 +7,7 @@ mod handlers;
 mod retention_control;
 mod tapfer_id;
 mod updown;
+mod websocket;
 
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
@@ -16,7 +17,7 @@ use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::tapfer_id::TapferId;
 use crate::updown::upload_pool::UploadPool;
-use axum::routing::{get_service};
+use axum::routing::{any, get_service};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
@@ -69,7 +70,10 @@ async fn main() -> TapferResult<()> {
         ]));
 
     let lowercase_router = Router::new()
-        .route("/uploads/{id}", get(handlers::download::download_html).delete(handlers::delete::request_delete_asset))
+        .route(
+            "/uploads/{id}",
+            get(handlers::download::download_html).delete(handlers::delete::request_delete_asset),
+        )
         .layer(cors.clone());
 
     let fallback_service = ServiceBuilder::new()
@@ -88,6 +92,7 @@ async fn main() -> TapferResult<()> {
             "/uploads/{id}/download",
             get(handlers::download::download_file),
         )
+        .route("/uploads/{uuid}/ws", any(websocket::start_ws))
         .route("/qrcg/{id}", get(handlers::qrcode::get_qrcode_from_id))
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))

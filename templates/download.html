@@ -78,6 +78,23 @@
 		document.getElementById('expiry').innerHTML = `<strong>Expires:</strong> ${formatted}`;
 	}
 	main()
+
+	const ws = new WebSocket("{{ws_url}}");
+
+	ws.addEventListener("error", (e) => {
+		console.error("Failed to openWS:", e);
+	});
+
+	ws.addEventListener("open", () => {
+		console.log("WS opened!");
+	});
+
+	ws.addEventListener("message", (e) => {
+		console.log(e);
+		if (e.data === "\"DeleteAsset\"") {
+			window.location.reload();
+		}
+	});
 </script>
 </body>
 </html>

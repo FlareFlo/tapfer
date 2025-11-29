@@ -41,6 +41,7 @@ struct DownloadTemplate<'a> {
     delete_url: &'a str,
     qr_b64: String,
     unix_expiry: i64,
+    ws_url: &'a str,
 }
 
 pub async fn download_html(
@@ -77,6 +78,7 @@ pub async fn download_html(
             .expires_on_utc()
             .map(|e| e.unix_timestamp())
             .unwrap_or(0),
+        ws_url: &format!("ws://cdn.{host}/uploads/{id}/ws"),
     };
 
     Ok(Html(template.render()?))

@@ -3,6 +3,8 @@ use crate::error::TapferResult;
 use crate::handlers::get_any_meta;
 use crate::retention_control::delete_asset;
 use crate::updown::upload_pool::UploadFsm;
+use crate::websocket;
+use crate::websocket::WsEvent;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Redirect};
 use std::time::Duration;
@@ -20,6 +22,7 @@ use tracing::{error, info};
 pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
     let ((id, _), _) = get_any_meta(&path).await?;
     info!("Request to delete {id}");
+    websocket::broadcast_event(id, WsEvent::DeleteAsset).await?; // TODO: Catch instead of bubble, we need to continue here
 
     // Ensure the uploader (if present) fails the upload
     if let Some(handle) = UPLOAD_POOL.uploads.get(&id) {

@@ -14,6 +14,9 @@ impl TapferId {
             inner: Uuid::new_v4(),
         }
     }
+    pub fn from_id(id: Uuid) -> Self {
+        Self { inner: id }
+    }
 }
 
 impl FromStr for TapferId {

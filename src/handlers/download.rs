@@ -78,7 +78,7 @@ pub async fn download_html(
             .expires_on_utc()
             .map(|e| e.unix_timestamp())
             .unwrap_or(0),
-        ws_url: &format!("ws://cdn.{host}/uploads/{id}/ws"),
+        ws_url: &format!("wss://cdn.{host}/uploads/{id}/ws"),
     };
 
     Ok(Html(template.render()?))

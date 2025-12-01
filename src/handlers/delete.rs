@@ -3,8 +3,6 @@ use crate::error::TapferResult;
 use crate::handlers::get_any_meta;
 use crate::retention_control::delete_asset;
 use crate::updown::upload_pool::UploadFsm;
-use crate::websocket;
-use crate::websocket::WsEvent;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Redirect};
 use std::time::Duration;

@@ -22,7 +22,7 @@
 			<p><strong>Filename:</strong> {{filename}}</p>
 			<p><strong>MIME Type:</strong> {{mimetype}}</p>
 			<p id="expiry"><strong>Expires:</strong> {{expiry}}</p>
-			<p><strong>Size:</strong> {{filesize}}</p>
+			<p><strong>Size:</strong> {{filesize}}<span id="upload_percentage"></span></p>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<form action="{{download_url}}" method="get">
@@ -89,12 +89,22 @@
 		console.log("WS opened!");
 	});
 
+	let upload_percentage = document.getElementById("upload_percentage");
 	ws.addEventListener("message", (e) => {
 		const payload = JSON.parse(e.data);
-		console.log(e);
-		switch (payload.event) {
-			case "DeleteAsset": window.location.reload();
-			break;
+		switch (payload.event.key) {
+			case "DeleteAsset":
+				window.location.reload();
+				break;
+			case "UploadProgress":
+				const total = payload.event.total;
+				const progress = payload.event.progress;
+				let percentage = (progress / total) * 100;
+				upload_percentage.innerText = ` Uploading(${percentage.toFixed(1)}%)`;
+				break;
+			case "UploadComplete":
+				upload_percentage.innerText = "";
+				break;
 		}
 	});
 </script>

@@ -1,4 +1,3 @@
-use std::ops::{Add, AddAssign};
 use crate::error::TapferResult;
 use crate::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
@@ -17,7 +16,6 @@ static WS_MAP: LazyLock<DashMap<TapferId, WeakSender<WsEvent>>> = LazyLock::new(
 pub async fn broadcast_event(id: TapferId, event: WsEvent) -> TapferResult<()> {
     // Check if someone's listening
     let Some(rx) = WS_MAP.get(&id) else {
-        warn!("Tried sending WS but noone was listening");
         return Ok(());
     };
 
@@ -56,7 +54,6 @@ async fn handle_socket(mut socket: WebSocket, id: TapferId) {
         };
         tx_seq += 1;
 
-        warn!("Sending");
         socket
             .send(Message::text(serde_json::to_string(&msg).unwrap()))
             .await
@@ -72,11 +69,13 @@ pub struct WsPacket {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "key")]
 pub enum WsEvent {
     DeleteAsset,
     UploadProgress {
         progress: u64,
         total: u64,
-    }
+    },
+    UploadComplete,
 }
 

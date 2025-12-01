@@ -25,11 +25,11 @@ impl UploadFsm {
         Self::InProgress { progress: 0 }
     }
 
-    pub fn add_progress(&mut self, new_progress: usize) -> TapferResult<()> {
+    pub fn add_progress(&mut self, new_progress: usize) -> TapferResult<u64> {
         match self {
             UploadFsm::InProgress { progress } => {
                 *progress += new_progress as u64;
-                Ok(())
+                Ok(*progress)
             }
             _ => Err(TapferError::UploadHandleSize(*self)),
         }

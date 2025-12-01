@@ -5,7 +5,7 @@ use crate::retention_control::delete_asset;
 use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
-use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL};
+use crate::{websocket, PROGRESS_TOKEN_LUT, UPLOAD_POOL};
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query};
 use axum::http::StatusCode;
@@ -24,6 +24,7 @@ use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{debug, error, info, warn};
+use crate::websocket::WsEvent;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
@@ -167,6 +168,7 @@ async fn payload_field(
     .await?;
     // The upload is complete, mark the upload as complete
     handle.write_fsm().await.mark_complete();
+    websocket::broadcast_event(id, WsEvent::UploadComplete).await?;
     Ok(())
 }
 
@@ -248,6 +250,8 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
 
         let mut pinned = pin!(&mut self.file);
         let pollres = pinned.as_mut().poll_write(cx, buf);
+        #[cfg(feature = "dev-slow-upload")]
+        std::thread::sleep(std::time::Duration::from_millis(100));
         if let Poll::Ready(Ok(n)) = pollres {
             if self.write_to_meta {
                 self.metadata
@@ -256,9 +260,14 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
             }
             let handle = self.upload_handle.clone();
             task::spawn(async move {
-                let e = handle.write_fsm().await.add_progress(n);
-                if e.is_err() {
-                    error!("Failed to add progress, fsm is already marked as completed?");
+                match  handle.write_fsm().await.add_progress(n) {
+                    Ok(current_progress) => {
+                        let total_size = handle.file_meta().size();
+                        let e = websocket::broadcast_event(handle.id(), WsEvent::UploadProgress { progress: current_progress, total: total_size }).await;
+                    }
+                    Err(e) => {
+                        error!("Failed to add progress, fsm is already marked as completed?");
+                    }
                 }
                 handle.notify_all_downloaders();
             });

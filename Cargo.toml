@@ -60,3 +60,7 @@ human_bytes = "0.4.3"
 dashmap = "6.1.0"
 scopeguard = "1.2.0"
 mime = "0.3.17"
+
+
+[features]
+dev-slow-upload  = []

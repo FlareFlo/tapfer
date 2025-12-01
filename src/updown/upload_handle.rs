@@ -61,6 +61,8 @@ impl UploadHandle {
     pub fn file_meta(&self) -> &FileMeta {
         &self.file_meta
     }
+    
+    pub fn id(&self) -> TapferId {self.id}
 }
 
 impl Drop for UploadHandle {

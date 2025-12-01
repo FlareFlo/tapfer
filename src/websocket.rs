@@ -5,6 +5,7 @@ use axum::extract::{Path, WebSocketUpgrade};
 use axum::response::Response;
 use dashmap::DashMap;
 use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast::WeakSender;
 use tokio::sync::broadcast::channel;
 use tracing::warn;
@@ -39,7 +40,6 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
 
 async fn handle_socket(mut socket: WebSocket, id: TapferId) {
     let mut tx_seq = 0;
-    warn!("Handling socket");
     let (tx, mut rx) = if let Some(tx) = WS_MAP.get(&id).map(|rx| rx.upgrade()).flatten() {
         (tx.clone(), tx.subscribe())
     } else {
@@ -47,7 +47,16 @@ async fn handle_socket(mut socket: WebSocket, id: TapferId) {
         WS_MAP.insert(id, tx.downgrade());
         (tx, rx)
     };
+    let cooldown = Duration::from_millis(1000 / 30); // 30Hz
+    let mut last_progress = Instant::now() - cooldown;
     while let Ok(msg) = rx.recv().await {
+
+        // Rate-limit progress
+        if matches!(msg, WsEvent::UploadProgress {..}) && last_progress.elapsed() < cooldown {
+            continue
+        }
+        last_progress = Instant::now();
+
         let msg = WsPacket {
             seq: tx_seq,
             event: msg,

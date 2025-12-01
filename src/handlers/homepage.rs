@@ -22,8 +22,5 @@ pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
         qr_b64: random_base64_qr_from_id(&host)?,
     };
 
-    Ok(Html(
-        template
-        .render()?,
-    ))
+    Ok(Html(template.render()?))
 }

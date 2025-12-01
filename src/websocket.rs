@@ -50,10 +50,9 @@ async fn handle_socket(mut socket: WebSocket, id: TapferId) {
     let cooldown = Duration::from_millis(1000 / 30); // 30Hz
     let mut last_progress = Instant::now() - cooldown;
     while let Ok(msg) = rx.recv().await {
-
         // Rate-limit progress
-        if matches!(msg, WsEvent::UploadProgress {..}) && last_progress.elapsed() < cooldown {
-            continue
+        if matches!(msg, WsEvent::UploadProgress { .. }) && last_progress.elapsed() < cooldown {
+            continue;
         }
         last_progress = Instant::now();
 
@@ -81,10 +80,6 @@ pub struct WsPacket {
 #[serde(tag = "key")]
 pub enum WsEvent {
     DeleteAsset,
-    UploadProgress {
-        progress: u64,
-        total: u64,
-    },
+    UploadProgress { progress: u64, total: u64 },
     UploadComplete,
 }
-

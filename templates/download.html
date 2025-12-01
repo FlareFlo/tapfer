@@ -90,9 +90,11 @@
 	});
 
 	ws.addEventListener("message", (e) => {
+		const payload = JSON.parse(e.data);
 		console.log(e);
-		if (e.data === "\"DeleteAsset\"") {
-			window.location.reload();
+		switch (payload.event) {
+			case "DeleteAsset": window.location.reload();
+			break;
 		}
 	});
 </script>

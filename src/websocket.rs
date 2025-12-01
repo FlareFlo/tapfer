@@ -1,3 +1,4 @@
+use std::ops::{Add, AddAssign};
 use crate::error::TapferResult;
 use crate::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
@@ -39,6 +40,7 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
 }
 
 async fn handle_socket(mut socket: WebSocket, id: TapferId) {
+    let mut tx_seq = 0;
     warn!("Handling socket");
     let (tx, mut rx) = if let Some(tx) = WS_MAP.get(&id).map(|rx| rx.upgrade()).flatten() {
         (tx.clone(), tx.subscribe())
@@ -48,6 +50,12 @@ async fn handle_socket(mut socket: WebSocket, id: TapferId) {
         (tx, rx)
     };
     while let Ok(msg) = rx.recv().await {
+        let msg = WsPacket {
+            seq: tx_seq,
+            event: msg,
+        };
+        tx_seq += 1;
+
         warn!("Sending");
         socket
             .send(Message::text(serde_json::to_string(&msg).unwrap()))
@@ -58,6 +66,17 @@ async fn handle_socket(mut socket: WebSocket, id: TapferId) {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WsPacket {
+    seq: u64,
+    event: WsEvent,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum WsEvent {
     DeleteAsset,
+    UploadProgress {
+        progress: u64,
+        total: u64,
+    }
 }
+

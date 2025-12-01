@@ -1,5 +1,5 @@
 pub(crate) use crate::GLOBAL_RETENTION_POLICY;
-use crate::UPLOAD_POOL;
+use crate::{websocket, UPLOAD_POOL};
 use crate::error::TapferResult;
 use crate::file_meta::FileMeta;
 use crate::tapfer_id::TapferId;
@@ -9,6 +9,7 @@ use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
 use tracing::{error, info};
+use crate::websocket::WsEvent;
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,
@@ -36,6 +37,9 @@ pub async fn check_against_global_retention(
 }
 
 pub async fn delete_asset(asset: TapferId) -> TapferResult<()> {
+    if let Err(e) = websocket::broadcast_event(asset, WsEvent::DeleteAsset).await {
+        error!("Failed to broadcast deletion event: {}", e);
+    };
     fs::remove_dir_all(format!("data/{asset}")).await?;
     Ok(())
 }

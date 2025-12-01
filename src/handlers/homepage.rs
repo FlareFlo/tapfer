@@ -15,14 +15,15 @@ pub struct Homepage {
 }
 
 pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
+    let template = Homepage {
+        embed_image_url: FAVICON,
+        embed_description: EMBED_DESCRIPTION,
+        qr_size: QR_CODE_SIZE,
+        qr_b64: random_base64_qr_from_id(&host)?,
+    };
+
     Ok(Html(
-        Homepage {
-            embed_image_url: FAVICON,
-            embed_description: EMBED_DESCRIPTION,
-            qr_size: QR_CODE_SIZE,
-            qr_b64: random_base64_qr_from_id(&host)?,
-        }
-        .render()
-        .unwrap(),
+        template
+        .render()?,
     ))
 }

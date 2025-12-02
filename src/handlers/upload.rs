@@ -5,7 +5,7 @@ use crate::retention_control::delete_asset;
 use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
-use crate::websocket::{WsEvent};
+use crate::websocket::WsEvent;
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL, websocket};
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query};
@@ -24,7 +24,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
@@ -118,7 +118,7 @@ async fn do_upload(
 
     // Notify waiting deposit that they can now view the entry
     if let Some(deposit) = params.deposit {
-        websocket::broadcast_event(deposit, WsEvent::DepositReady {id}).await?;
+        websocket::broadcast_event(deposit, WsEvent::DepositReady { id }).await?;
     }
 
     while let Some(field) = multipart.next_field().await? {
@@ -277,8 +277,11 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
                             },
                         )
                         .await;
+                        if let Err(e) = e {
+                            error!("error broadcasting: {:?}", e);
+                        }
                     }
-                    Err(e) => {
+                    Err(_) => {
                         error!("Failed to add progress, fsm is already marked as completed?");
                     }
                 }

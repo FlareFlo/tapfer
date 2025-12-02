@@ -9,11 +9,11 @@ mod tapfer_id;
 mod updown;
 mod websocket;
 
-use crate::handlers::deposit;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::error::TapferResult;
+use crate::handlers::deposit;
 use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::tapfer_id::TapferId;

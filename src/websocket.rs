@@ -32,7 +32,10 @@ impl From<u64> for WsDestination {
 }
 
 // Public API for other handlers to use
-pub async fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> TapferResult<()> {
+pub async fn broadcast_event(
+    dst: impl Into<WsDestination> + Copy,
+    event: WsEvent,
+) -> TapferResult<()> {
     // Check if someone's listening
     let Some(rx) = WS_MAP.get(&dst.into()) else {
         if matches!(dst.into(), WsDestination::Deposit(_)) {
@@ -68,7 +71,7 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
 
 pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestination> + Copy) {
     let mut tx_seq = 0;
-    let (tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).map(|rx| rx.upgrade()).flatten() {
+    let (_tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).map(|rx| rx.upgrade()).flatten() {
         (tx.clone(), tx.subscribe())
     } else {
         let (tx, rx) = channel(100);
@@ -110,7 +113,5 @@ pub enum WsEvent {
     DeleteAsset,
     UploadProgress { progress: u64, total: u64 },
     UploadComplete,
-    DepositReady {
-        id: TapferId,
-    },
+    DepositReady { id: TapferId },
 }

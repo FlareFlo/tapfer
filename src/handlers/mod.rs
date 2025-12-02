@@ -11,12 +11,12 @@ use std::str::FromStr;
 use tokio::fs;
 
 pub mod delete;
+pub mod deposit;
 pub mod download;
 pub mod homepage;
 mod not_found;
 pub mod qrcode;
 pub mod upload;
-pub mod deposit;
 
 async fn get_any_meta(path: &String) -> TapferResult<((TapferId, FileMeta), UpDownFsm)> {
     let id = TapferId::from_str(path)?;

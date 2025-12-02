@@ -68,7 +68,7 @@ pub async fn accept_form(
     info!("Completed upload of {id}");
 
     let method = if host.contains("localhost") {
-        host = "".to_owned();
+        host = String::new();
         ""
     } else {
         host = host.replace("cdn.", "");
@@ -103,7 +103,7 @@ async fn do_upload(
         );
     }
 
-    expiration_field(params.expiration.as_deref(), &mut meta).await?;
+    expiration_field(params.expiration.as_deref(), &mut meta)?;
 
     if let Some(tok) = in_progress_token {
         info!("Adding progress token {tok}");
@@ -118,7 +118,7 @@ async fn do_upload(
 
     // Notify waiting deposit that they can now view the entry
     if let Some(deposit) = params.deposit {
-        websocket::broadcast_event(deposit, WsEvent::DepositReady { id }).await?;
+        websocket::broadcast_event(deposit, WsEvent::DepositReady { id })?;
     }
 
     while let Some(field) = multipart.next_field().await? {
@@ -126,16 +126,13 @@ async fn do_upload(
             .name()
             .ok_or(TapferError::MultipartFieldNameMissing)?
             .to_string();
-        match name.as_str() {
-            "file" => {
-                payload_field(field, id, meta.clone(), size).await?;
-            }
-            _ => {
-                error!("Got unexpected form field {name}");
-                Err(TapferError::UnknownMultipartField {
-                    field_name: name.to_owned(),
-                })?;
-            }
+        if name.as_str() == "file" {
+            payload_field(field, id, meta.clone(), size).await?;
+        } else {
+            error!("Got unexpected form field {name}");
+            Err(TapferError::UnknownMultipartField {
+                field_name: name.clone(),
+            })?;
         }
     }
     Ok(())
@@ -149,8 +146,7 @@ async fn payload_field(
 ) -> TapferResult<()> {
     let file_name = field
         .file_name()
-        .map(ToOwned::to_owned)
-        .unwrap_or_else(|| id.to_string());
+        .map_or_else(|| id.to_string(), ToOwned::to_owned);
     let content_type = field
         .content_type()
         .unwrap_or(mime::APPLICATION_OCTET_STREAM.as_ref())
@@ -174,11 +170,11 @@ async fn payload_field(
     .await?;
     // The upload is complete, mark the upload as complete
     handle.write_fsm().await.mark_complete();
-    websocket::broadcast_event(id, WsEvent::UploadComplete).await?;
+    websocket::broadcast_event(id, WsEvent::UploadComplete)?;
     Ok(())
 }
 
-async fn expiration_field(field: Option<&str>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
+fn expiration_field(field: Option<&str>, meta: &mut FileMetaBuilder) -> TapferResult<()> {
     let Some(f) = field else {
         return Ok(());
     };
@@ -187,7 +183,7 @@ async fn expiration_field(field: Option<&str>, meta: &mut FileMetaBuilder) -> Ta
         "24_hours" => {
             meta.expiration = Some(RemovalPolicy::Expiry {
                 after: TimeDuration::hours(24),
-            })
+            });
         }
         _ => {
             Err(TapferError::InvalidExpiration(f.to_owned()))?;
@@ -275,8 +271,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
                                 progress: current_progress,
                                 total: total_size,
                             },
-                        )
-                        .await;
+                        );
                         if let Err(e) = e {
                             error!("error broadcasting: {:?}", e);
                         }

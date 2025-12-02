@@ -37,9 +37,9 @@ pub async fn check_against_global_retention(
 }
 
 pub async fn delete_asset(asset: TapferId) -> TapferResult<()> {
-    if let Err(e) = websocket::broadcast_event(asset, WsEvent::DeleteAsset).await {
+    if let Err(e) = websocket::broadcast_event(asset, WsEvent::DeleteAsset) {
         error!("Failed to broadcast deletion event: {}", e);
-    };
+    }
     fs::remove_dir_all(format!("data/{asset}")).await?;
     Ok(())
 }
@@ -70,7 +70,7 @@ pub async fn check_all_assets() -> TapferResult<()> {
                 );
                 remove_dir_all(entry.path()).await?;
             }
-        };
+        }
     }
     Ok(())
 }

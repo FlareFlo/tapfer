@@ -33,7 +33,7 @@ pub async fn request_delete_asset(Path(path): Path<String>) -> TapferResult<impl
     } else {
         let r = delete_asset(id).await;
         match r {
-            Ok(_) => {
+            Ok(()) => {
                 info!("Deleted {id} as requested");
             }
             Err(e) => {

@@ -33,8 +33,7 @@ pub enum FileSize {
 impl FileSize {
     pub fn current_size(&self) -> u64 {
         match self {
-            FileSize::AlreadyKnown(s) => *s,
-            FileSize::Dynamic(s) => *s,
+            FileSize::AlreadyKnown(s) | FileSize::Dynamic(s) => *s,
         }
     }
 

@@ -32,10 +32,7 @@ impl From<u64> for WsDestination {
 }
 
 // Public API for other handlers to use
-pub async fn broadcast_event(
-    dst: impl Into<WsDestination> + Copy,
-    event: WsEvent,
-) -> TapferResult<()> {
+pub fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> TapferResult<()> {
     // Check if someone's listening
     let Some(rx) = WS_MAP.get(&dst.into()) else {
         if matches!(dst.into(), WsDestination::Deposit(_)) {
@@ -79,7 +76,7 @@ pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestin
         (tx, rx)
     };
     let cooldown = Duration::from_millis(1000 / 30); // 30Hz
-    let mut last_progress = Instant::now() - cooldown;
+    let mut last_progress = Instant::now().checked_sub(cooldown).unwrap();
     while let Ok(msg) = rx.recv().await {
         // Rate-limit progress
         if matches!(msg, WsEvent::UploadProgress { .. }) && last_progress.elapsed() < cooldown {

@@ -55,7 +55,7 @@ pub async fn download_html(
         format_description!("[hour]:[minute] [day]-[month]-[year]");
     let expiry = match meta.removal_policy() {
         RemovalPolicy::SingleDownload => " after a single download".to_owned(),
-        RemovalPolicy::Expiry { .. } => meta.expires_on_utc().unwrap().format(&DES)?.to_string(),
+        RemovalPolicy::Expiry { .. } => meta.expires_on_utc().unwrap().format(&DES)?.clone(),
     };
 
     let template = DownloadTemplate {
@@ -77,8 +77,7 @@ pub async fn download_html(
         qr_b64: base64_qr_from_id(id, &host)?,
         unix_expiry: meta
             .expires_on_utc()
-            .map(|e| e.unix_timestamp())
-            .unwrap_or(0),
+            .map_or(0, time::UtcDateTime::unix_timestamp),
         ws_url: &format!("{}://{host}/uploads/{id}/ws", wss_method(&host)),
     };
 
@@ -185,9 +184,9 @@ impl Drop for DownloadStream {
             if meta.remove_after_download() {
                 info!("Removing {id} as its download has completed");
                 match delete_asset(id).await {
-                    Ok(_) => {}
+                    Ok(()) => {}
                     Err(e) => {
-                        error!("Failed to delete {id} because {e:?}")
+                        error!("Failed to delete {id} because {e:?}");
                     }
                 }
             }
@@ -235,8 +234,8 @@ impl futures_core::Stream for DownloadStream {
                                 let timeout = tokio::time::sleep(Duration::from_millis(100));
                                 let progress = handle.wait_for_progress();
                                 select! {
-                                    _ = timeout => (),
-                                    _ = progress => (),
+                                    () = timeout => (),
+                                    () = progress => (),
                                 }
                                 waker.wake();
                             });

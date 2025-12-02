@@ -18,7 +18,6 @@ pub struct Deposit {
 	qr_size: usize,
 	qr_b64: String,
 	ws_url: String,
-	upload_url: String,
 }
 
 pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
@@ -36,7 +35,6 @@ pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
 		qr_size: QR_CODE_SIZE,
 		qr_b64: BASE64_STANDARD.encode(&qr_code),
 		ws_url: format!("{}://{host}/deposit/ws?deposit={deposit_id}", wss_method(&host)),
-		upload_url: format!("{host}/uploads/"),
 	};
 
 	Ok(Html(template.render()?))

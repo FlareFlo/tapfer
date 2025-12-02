@@ -48,7 +48,7 @@
 		const payload = JSON.parse(e.data);
 		switch (payload.event.key) {
 			case "DepositReady":
-				window.location.href = "{{upload_url}}" + payload.event.id;
+				window.location.href = "/uploads/" + payload.event.id;
 				break;
 		}
 	});

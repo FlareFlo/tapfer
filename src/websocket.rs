@@ -32,9 +32,12 @@ impl From<u64> for WsDestination {
 }
 
 // Public API for other handlers to use
-pub async fn broadcast_event(dst: impl Into<WsDestination>, event: WsEvent) -> TapferResult<()> {
+pub async fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> TapferResult<()> {
     // Check if someone's listening
     let Some(rx) = WS_MAP.get(&dst.into()) else {
+        if matches!(dst.into(), WsDestination::Deposit(_)) {
+            warn!("Event for deposit has no listeners");
+        }
         return Ok(());
     };
 

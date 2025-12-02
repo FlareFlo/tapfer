@@ -25,7 +25,7 @@ pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
 	let deposit_id = Uuid::new_v4().as_u64_pair().0; // Hacky? Sure. But this avoids another RNG library that we use once
 
 	let qr_code = qrcode_generator::to_png_to_vec_from_str(
-		format!("https://{host}/uploads?deposit={deposit_id}",),
+		format!("https://{host}?deposit={deposit_id}",),
 		QR_CODE_ECC,
 		QR_CODE_SIZE,
 	)?;

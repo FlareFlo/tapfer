@@ -71,7 +71,7 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
 
 pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestination> + Copy) {
     let mut tx_seq = 0;
-    let (_tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).map(|rx| rx.upgrade()).flatten() {
+    let (_tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).and_then(|rx| rx.upgrade()) {
         (tx.clone(), tx.subscribe())
     } else {
         let (tx, rx) = channel(100);

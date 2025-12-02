@@ -21,7 +21,7 @@ impl UploadPool {
     pub fn handle(&self, id: TapferId, file_meta: FileMeta) -> UploadHandle {
         let handle = UploadHandle {
             handle: Arc::new(RwLock::new(UploadFsm::initial())),
-            id: id,
+            id,
             file_meta,
             notify: Arc::new(Notify::new()),
         };

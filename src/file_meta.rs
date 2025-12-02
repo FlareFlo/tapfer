@@ -119,8 +119,7 @@ impl FileMetaBuilder {
             },
             created: self
                 .timezone
-                .map(|tz| timezones::get_by_name(&tz))
-                .flatten()
+                .and_then(|tz| timezones::get_by_name(&tz))
                 .map(|tz| OffsetDateTime::now_utc().to_timezone(tz).to_utc())
                 .unwrap_or_else(|| {
                     error!("No TZ zet for {}", name);

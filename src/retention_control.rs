@@ -57,9 +57,8 @@ pub async fn check_all_assets() -> TapferResult<()> {
         if let Ok(meta) = FileMeta::read_from_id_path(&entry.path()).await {
             check_against_global_retention(meta, now).await?;
         } else {
-            let id = TapferId::from_str(&entry.path().to_string_lossy()).map_err(|e| {
+            let id = TapferId::from_str(&entry.path().to_string_lossy()).inspect_err(|_| {
                 error!("Failed to check asset {entry:?}");
-                e
             })?;
 
             // Only delete element if it isn't in progress

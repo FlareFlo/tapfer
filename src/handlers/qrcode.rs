@@ -9,7 +9,7 @@ use axum_extra::extract::Host;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use qrcode_generator::QrCodeEcc;
-use std::iter::{once, repeat};
+use std::iter::once;
 
 fn qr_from_id(id: TapferId, host: &str) -> TapferResult<Vec<u8>> {
     let qrc = qrcode_generator::to_png_to_vec_from_str(
@@ -28,7 +28,7 @@ pub fn base64_qr_from_id(id: TapferId, host: &str) -> TapferResult<String> {
 }
 
 pub fn random_base64_qr_from_id(host: &str) -> TapferResult<String> {
-    base64_qr_from_id(TapferId::new_random(), &host)
+    base64_qr_from_id(TapferId::new_random(), host)
 }
 
 #[allow(dead_code)]
@@ -46,7 +46,7 @@ pub fn tiny_qr_from_id(id: TapferId, host: &str) -> TapferResult<String> {
 
     let s = top_border
         .chunks(2)
-        .map(|e| TryInto::<&[Vec<bool>; 2]>::try_into(e))
+        .map(TryInto::<&[Vec<bool>; 2]>::try_into)
         // Not the best idea alright, but it avoids allocations
         .filter_map(Result::ok)
         .map(|[top, bottom]| {
@@ -65,7 +65,9 @@ pub fn tiny_qr_from_id(id: TapferId, host: &str) -> TapferResult<String> {
                 .chain(once('\n'))
                 .collect::<String>()
         })
-        .chain(once(repeat(full).take(top_border.len() + 1).collect())) // Bottom border
+        .chain(once(
+            std::iter::repeat_n(full, top_border.len() + 1).collect(),
+        )) // Bottom border
         .collect();
     Ok(s)
 }

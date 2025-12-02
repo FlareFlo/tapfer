@@ -176,6 +176,11 @@
             "expiration": formData.get("expiration"),
             "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
         });
+		// Forward deposit ID
+		const current_params = new URLSearchParams(window.location.search);
+		if (current_params.has("deposit")) {
+			params.append("deposit", current_params.get("deposit"));
+		}
 
         main_xhr.open('POST', `${cdnUrl}/?${params.toString()}`, true);
 

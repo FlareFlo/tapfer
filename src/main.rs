@@ -9,6 +9,7 @@ mod tapfer_id;
 mod updown;
 mod websocket;
 
+use crate::handlers::deposit;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -84,6 +85,8 @@ async fn main() -> TapferResult<()> {
     // build our application with some routes
     let app = Router::new()
         .route("/", get(homepage::show_form).post(upload::accept_form))
+        .route("/deposit", get(deposit::show_form))
+        .route("/deposit/ws", any(deposit::start_ws))
         .route(
             "/uploads/query_id/{token}",
             get(handlers::upload::progress_token_to_id),

@@ -11,12 +11,30 @@ use tokio::sync::broadcast::channel;
 use tracing::warn;
 use uuid::Uuid;
 
-static WS_MAP: LazyLock<DashMap<TapferId, WeakSender<WsEvent>>> = LazyLock::new(DashMap::new);
+static WS_MAP: LazyLock<DashMap<WsDestination, WeakSender<WsEvent>>> = LazyLock::new(DashMap::new);
+
+#[derive(Eq, Hash, PartialEq)]
+pub enum WsDestination {
+    Id(TapferId),
+    Deposit(u64),
+}
+
+impl From<TapferId> for WsDestination {
+    fn from(value: TapferId) -> Self {
+        WsDestination::Id(value)
+    }
+}
+
+impl From<u64> for WsDestination {
+    fn from(value: u64) -> Self {
+        WsDestination::Deposit(value)
+    }
+}
 
 // Public API for other handlers to use
-pub async fn broadcast_event(id: TapferId, event: WsEvent) -> TapferResult<()> {
+pub async fn broadcast_event(dst: impl Into<WsDestination>, event: WsEvent) -> TapferResult<()> {
     // Check if someone's listening
-    let Some(rx) = WS_MAP.get(&id) else {
+    let Some(rx) = WS_MAP.get(&dst.into()) else {
         return Ok(());
     };
 
@@ -30,6 +48,13 @@ pub async fn broadcast_event(id: TapferId, event: WsEvent) -> TapferResult<()> {
     Ok(())
 }
 
+pub fn wss_method(host: &str) -> &str {
+    match host {
+        "localhost:3000" => "ws",
+        _ => "wss",
+    }
+}
+
 // Impl
 
 #[axum::debug_handler]
@@ -38,13 +63,13 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, id))
 }
 
-async fn handle_socket(mut socket: WebSocket, id: TapferId) {
+pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestination> + Copy) {
     let mut tx_seq = 0;
-    let (tx, mut rx) = if let Some(tx) = WS_MAP.get(&id).map(|rx| rx.upgrade()).flatten() {
+    let (tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).map(|rx| rx.upgrade()).flatten() {
         (tx.clone(), tx.subscribe())
     } else {
         let (tx, rx) = channel(100);
-        WS_MAP.insert(id, tx.downgrade());
+        WS_MAP.insert(dst.into(), tx.downgrade());
         (tx, rx)
     };
     let cooldown = Duration::from_millis(1000 / 30); // 30Hz
@@ -82,4 +107,7 @@ pub enum WsEvent {
     DeleteAsset,
     UploadProgress { progress: u64, total: u64 },
     UploadComplete,
+    DepositReady {
+        id: TapferId,
+    },
 }

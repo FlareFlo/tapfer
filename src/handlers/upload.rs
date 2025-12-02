@@ -5,7 +5,7 @@ use crate::retention_control::delete_asset;
 use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
-use crate::websocket::WsEvent;
+use crate::websocket::{WsEvent};
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL, websocket};
 use axum::extract::multipart::Field;
 use axum::extract::{Multipart, Path, Query};
@@ -32,6 +32,7 @@ pub struct UploadParameters {
     progress_token: Option<String>,
     expiration: Option<String>,
     timezone: Option<String>,
+    deposit: Option<u64>,
 }
 
 #[utoipa::path(
@@ -43,6 +44,7 @@ pub struct UploadParameters {
         ("progress_token" = Option<u32>, description = "random ID to associate upload with frontend"),
         ("timezone" = Option<String>, description = "client timezone in IANA string format, UTC otherwise"),
         ("expiration" = Option<String>, description = "Expiration either as `single_download` or `24_hours`"),
+        ("deposit" = Option<u64>, description = "Deposit ID to notify uploader about")
     ),
     responses(
         (status = 200, description = "URL to asset page"),
@@ -114,12 +116,16 @@ async fn do_upload(
         }
     }
 
+    // Notify waiting deposit that they can now view the entry
+    if let Some(deposit) = params.deposit {
+        websocket::broadcast_event(deposit, WsEvent::DepositReady {id}).await?;
+    }
+
     while let Some(field) = multipart.next_field().await? {
         let name = field
             .name()
             .ok_or(TapferError::MultipartFieldNameMissing)?
             .to_string();
-        debug!("reading field {name}");
         match name.as_str() {
             "file" => {
                 payload_field(field, id, meta.clone(), size).await?;

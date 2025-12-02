@@ -26,6 +26,7 @@ use tokio::select;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info};
+use crate::websocket::wss_method;
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -78,7 +79,7 @@ pub async fn download_html(
             .expires_on_utc()
             .map(|e| e.unix_timestamp())
             .unwrap_or(0),
-        ws_url: &format!("wss://{host}/uploads/{id}/ws"),
+        ws_url: &format!("{}://{host}/uploads/{id}/ws", wss_method(&host)),
     };
 
     Ok(Html(template.render()?))

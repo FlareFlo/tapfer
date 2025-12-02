@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Upload to Tapfer</title>
+	{% include "style.html" %}
+	{% include "favicon.html" %}
+	{% include "meta.html" %}
+	<style>
+        #uploadBox {
+            position: relative;
+            z-index: 1;
+            padding: 2em;
+            margin: auto;
+
+            /* PROGRESS GRADIENT */
+            background-image: linear-gradient(to right, #4caf50, #4caf50);
+            background-repeat: no-repeat;
+            background-size: 0% 100%;
+            background-color: #ffffff; /* fallback background */
+            transition: background-size 0.2s ease;
+
+        }
+	</style>
+</head>
+<body>
+<section class="container">
+	<div class="form-box" id="uploadBox">
+		<div class="container">
+			<p>Scan with phone to begin upload</p>
+			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
+		</div>
+	</div>
+</section>
+<script>
+	const ws = new WebSocket("{{ws_url}}");
+
+	ws.addEventListener("error", (e) => {
+		console.error("Failed to openWS:", e);
+	});
+
+	ws.addEventListener("open", () => {
+		console.log("WS opened!");
+	});
+
+	ws.addEventListener("message", (e) => {
+		const payload = JSON.parse(e.data);
+		switch (payload.event.key) {
+			case "DepositReady":
+				window.location.href = "{{upload_url}}" + payload.event.id;
+				break;
+		}
+	});
+</script>
+</body>
+</html>

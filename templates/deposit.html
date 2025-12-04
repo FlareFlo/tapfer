@@ -25,6 +25,7 @@
 	</style>
 </head>
 <body>
+{%include "components/toast.html" %}
 <section class="container">
 	<div class="form-box" id="uploadBox">
 		<div class="container">
@@ -38,6 +39,7 @@
 
 	ws.addEventListener("error", (e) => {
 		console.error("Failed to openWS:", e);
+        show_toast("Failed to open WS", "error");
 	});
 
 	ws.addEventListener("open", () => {

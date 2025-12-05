@@ -57,6 +57,7 @@
 	</style>
 </head>
 <body>
+{% include "components/toast.html" %}
 <section class="container">
 	<div id="blurred-percentage"></div>
 	<div class="form-box" id="uploadBox">
@@ -115,7 +116,7 @@
 
     copylink_button.addEventListener("click", () => {
 		navigator.clipboard.writeText(download_url.href);
-		copylink_button.innerText = "Copied!";
+        show_toast("Copied to clipboard!", "success");
 	});
 
     // Prevent default actions
@@ -251,13 +252,17 @@
             fired = true;
         });
 
+        main_xhr.addEventListener('error', function (e) {
+            show_toast("XHR failed", "error");
+		})
+
         main_xhr.onload = function () {
             // Follow redirect to upload location
             if (main_xhr.status >= 200 && main_xhr.status < 300) {
                 console.log(`redirecting to ${main_xhr.responseText}`);
                 window.location.href = main_xhr.responseText;
             } else {
-                alert('Upload failed.');
+                show_toast('Upload failed', "error");
                 background.style.backgroundSize = '0% 100%';
             }
         };

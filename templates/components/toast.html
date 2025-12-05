@@ -46,7 +46,25 @@
     }
 </style>
 <script>
-    function show_toast(text, level) {
+
+	let toasts = [];
+    let showing_toast = false;
+
+	function show_toast(text, level) {
+        toasts.push({ text, level });
+        while (!showing_toast) {
+            _show_toast();
+		}
+	}
+    function _show_toast() {
+        if (toasts.length === 0) {
+         	showing_toast = false;
+            return
+		}
+
+        const { text, level } = toasts.shift();
+        showing_toast = true;
+
         // Get the toast DIV
         const toast_container = document.getElementById("toast");
         const toast = document.createElement("div");
@@ -75,8 +93,11 @@
         // After 3 seconds, remove the show class from DIV
         setTimeout(function(){
             toast.className = toast.className.replace("show", "");
-            setTimeout(function(){toast.remove()}, 1000)
-            }, 3000);
+            setTimeout(function(){
+                toast.remove();
+                _show_toast();
+				}, 500)
+		}, 2500);
     }
 </script>
 <div id="toast"></div>

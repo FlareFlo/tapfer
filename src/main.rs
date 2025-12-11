@@ -169,6 +169,7 @@ async fn handle_cdn_redirect(
             let mut parts = req.uri().clone().into_parts();
             dbg!(&parts);
 
+            // None on localhost
             parts.authority = parts.authority.map(|a|{
                 let mut new = a.host().replacen("cdn.", "", 1);
                 if let Some(port) = a.port() {

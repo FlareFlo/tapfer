@@ -7,6 +7,7 @@ use qrcode_generator::QRCodeError;
 use std::array::TryFromSliceError;
 use std::io;
 use std::num::ParseIntError;
+use http::uri::{InvalidUri, InvalidUriParts};
 use time::error::Format;
 
 pub type TapferResult<T> = Result<T, TapferError>;
@@ -74,6 +75,12 @@ pub enum TapferError {
 
     #[error(transparent)]
     TryFromSlice(#[from] TryFromSliceError),
+
+    #[error(transparent)]
+    InvalidUriParts(#[from] InvalidUriParts),
+
+    #[error(transparent)]
+    InvalidUri(#[from] InvalidUri),
 }
 
 impl IntoResponse for TapferError {
@@ -110,6 +117,8 @@ impl IntoResponse for TapferError {
             TimeFormat(_) => generic("time format"),
             UploadHandleSize(_) => generic("upload handle size"),
             TryFromSlice(_) => generic("try from slice"),
+            InvalidUriParts(_) => generic("invalid URL assembled by webserver"),
+            InvalidUri(_) => generic("invalid URI from webserver"),
         }
     }
 }

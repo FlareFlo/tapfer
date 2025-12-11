@@ -9,6 +9,9 @@ mod tapfer_id;
 mod updown;
 mod websocket;
 
+use axum::body::Body;
+use axum::response::{Redirect, Response};
+use axum::middleware::Next;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -22,10 +25,11 @@ use axum::routing::{any, get_service};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
-use http::HeaderValue;
+use http::{HeaderValue, Uri};
 use std::sync::LazyLock;
 use std::time::Duration;
 use std::{env, fs};
+use axum::extract::Request;
 use tokio::time::sleep;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
@@ -36,6 +40,7 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
+use matchit::Router as MatchitRouter;
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
@@ -103,7 +108,8 @@ async fn main() -> TapferResult<()> {
         .nest_service("/static", static_dir_service)
         .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
         .fallback_service(fallback_service)
-        .layer(cors);
+        .layer(cors)
+        .layer(middleware::from_fn(handle_cdn_redirect));
 
     let main_service = ServiceBuilder::new().service(app);
 
@@ -139,3 +145,45 @@ pub fn init_datadir() {
     )
     .unwrap();
 }
+
+static CDN_ALLOWED: LazyLock<MatchitRouter<()>> = LazyLock::new(||{
+    let mut r = MatchitRouter::new();
+    r.insert("/uploads/{id}/download", ()).unwrap();
+    r
+});
+
+async fn handle_cdn_redirect(
+    req: Request<Body>,
+    next: Next,
+) -> TapferResult<Response> {
+    let host = req.headers()
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("");
+
+
+    if host.starts_with("cdn.") {
+        let path = req.uri().path();
+
+        if CDN_ALLOWED.at(path).is_err() {
+            let mut parts = req.uri().clone().into_parts();
+            dbg!(&parts);
+
+            parts.authority = parts.authority.map(|a|{
+                let mut new = a.host().replacen("cdn.", "", 1);
+                if let Some(port) = a.port() {
+                    new.push_str(":");
+                    new.push_str(port.as_str());
+                }
+                Authority::from_str(&new)
+            }).transpose()?;
+            dbg!(&parts);
+            return Ok(Redirect::to(&Uri::from_parts(parts)?.to_string()).into_response());
+        }
+    }
+
+    Ok(next.run(req).await)
+}
+use axum::response::IntoResponse;
+use http::uri::Authority;
+use std::str::FromStr;

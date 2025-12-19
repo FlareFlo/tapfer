@@ -1,16 +1,18 @@
-use std::{fs, thread};
-use std::fs::File;
-use std::io::{Read};
-use axum::extract::Path;
-use axum::response::IntoResponse;
-use axum_extra::extract::Host;
-use futures::executor::block_on;
-use sha2::Digest;
-use tracing::error;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::FileMeta;
 use crate::handlers::get_any_meta;
 use crate::tapfer_id::TapferId;
+use axum::body::Body;
+use axum::extract::Path;
+use axum::response::{IntoResponse, Response};
+use axum_extra::extract::Host;
+use futures::executor::block_on;
+use http::StatusCode;
+use sha2::Digest;
+use std::fs::File;
+use std::io::Read;
+use std::{fs, thread};
+use tracing::error;
 
 #[utoipa::path(
 	get,
@@ -21,36 +23,44 @@ use crate::tapfer_id::TapferId;
 	),
 )]
 pub async fn get_sha512sum(
-	Path(path): Path<String>,
-	Host(host): Host,
+    Path(path): Path<String>,
+    Host(host): Host,
 ) -> TapferResult<impl IntoResponse> {
-	let ((id, _), _) = get_any_meta(&path).await?;
-	Ok(get_checksum_for_asset(id).map_err(todo!("Add 404 here")))
+    let ((id, _), _) = get_any_meta(&path).await?;
+    if let Some(chksum) = get_checksum_for_asset(id)? {
+        Ok(Response::builder().body(chksum)?)
+    } else {
+        Ok(Response::builder()
+            .status(StatusCode::PROCESSING)
+            .body("Checksum computation is in progress".to_owned())?)
+    }
 }
 
 pub fn get_checksum_for_asset(id: TapferId) -> TapferResult<Option<String>> {
-	let precomputed = fs::read_to_string(format!("data/{id}/checksum.sha512"));
+    let precomputed = fs::read_to_string(format!("data/{id}/checksum.sha512"));
 
-	Ok(precomputed.ok())
+    Ok(precomputed.ok())
 }
 
 pub fn spawn_sha512_checksum(id: TapferId) {
-	let core = move || {
-		let meta = block_on(FileMeta::read_from_id(id))?;
-		let mut asset = File::open(format!("data/{id}/{}", meta.name()))?;
-		let mut h = sha2::Sha512::new();
-		let mut buf = vec![0_u8; 2_usize.pow(30)]; // 1 GB at a time
-		while let read = asset.read(&mut buf)? {
-			Digest::update(&mut h, &buf[..read]);
-		}
-		fs::write(format!("data/{id}/checksum.sha512"), h.finalize())?;
-		Ok(())
-	};
-	// Ignore handle
-	let _ = thread::Builder::new().name(format!("hasher_{id}")).spawn(move ||{
-		let res: TapferResult<()> = core();
-		if let Err(e) = res {
-			error!("Failed to checksum {id} because of: {e}");
-		}
-	});
+    let core = move || {
+        let meta = block_on(FileMeta::read_from_id(id))?;
+        let mut asset = File::open(format!("data/{id}/{}", meta.name()))?;
+        let mut h = sha2::Sha512::new();
+        let mut buf = vec![0_u8; 2_usize.pow(30)]; // 1 GB at a time
+        while let read = asset.read(&mut buf)? {
+            Digest::update(&mut h, &buf[..read]);
+        }
+        fs::write(format!("data/{id}/checksum.sha512"), h.finalize())?;
+        Ok(())
+    };
+    // Ignore handle
+    let _ = thread::Builder::new()
+        .name(format!("hasher_{id}"))
+        .spawn(move || {
+            let res: TapferResult<()> = core();
+            if let Err(e) = res {
+                error!("Failed to checksum {id} because of: {e}");
+            }
+        });
 }

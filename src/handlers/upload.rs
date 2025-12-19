@@ -1,6 +1,7 @@
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
+use crate::handlers::checksum;
 use crate::retention_control::delete_asset;
 use crate::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
@@ -25,7 +26,6 @@ use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{error, info, warn};
-use crate::handlers::checksum;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {

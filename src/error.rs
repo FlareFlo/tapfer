@@ -74,6 +74,9 @@ pub enum TapferError {
 
     #[error(transparent)]
     TryFromSlice(#[from] TryFromSliceError),
+
+    #[error(transparent)]
+    Http(#[from] http::Error),
 }
 
 impl IntoResponse for TapferError {
@@ -110,6 +113,7 @@ impl IntoResponse for TapferError {
             TimeFormat(_) => generic("time format"),
             UploadHandleSize(_) => generic("upload handle size"),
             TryFromSlice(_) => generic("try from slice"),
+            Http(_) => generic("http"),
         }
     }
 }

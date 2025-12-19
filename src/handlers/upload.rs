@@ -25,6 +25,7 @@ use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
 use tokio_util::io::StreamReader;
 use tracing::{error, info, warn};
+use crate::handlers::checksum;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
@@ -66,6 +67,7 @@ pub async fn accept_form(
     }
     res?;
     info!("Completed upload of {id}");
+    checksum::spawn_sha512_checksum(id);
 
     let method = if host.contains("localhost") {
         host = String::new();

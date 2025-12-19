@@ -60,6 +60,8 @@ human_bytes = "0.4.3"
 dashmap = "6.1.0"
 scopeguard = "1.2.0"
 mime = "0.3.17"
+sha2 = "0.10.9"
+futures = { version = "0.3.31", default-features = false, features = ["executor"] }
 
 
 [features]

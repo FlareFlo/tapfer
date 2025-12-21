@@ -65,6 +65,12 @@ impl FileMeta {
         )?)
     }
 
+    pub fn read_from_id_blocking(id: TapferId) -> TapferResult<Self> {
+        Ok(toml::from_str(&std::fs::read_to_string(format!(
+            "data/{id}/meta.toml"
+        ))?)?)
+    }
+
     pub fn from_upload_handle(handle: &UploadHandle) -> Self {
         handle.file_meta().clone()
     }

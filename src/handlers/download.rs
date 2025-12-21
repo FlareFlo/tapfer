@@ -2,6 +2,7 @@ use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::error::{TapferError, TapferResult};
 use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers;
+use crate::handlers::checksum::get_sha512_for_asset;
 use crate::handlers::qrcode::base64_qr_from_id;
 use crate::retention_control::delete_asset;
 use crate::tapfer_id::TapferId;
@@ -43,6 +44,8 @@ struct DownloadTemplate<'a> {
     qr_b64: String,
     unix_expiry: i64,
     ws_url: &'a str,
+    sha512: String,
+    sha512url: String,
 }
 
 pub async fn download_html(
@@ -79,6 +82,8 @@ pub async fn download_html(
             .expires_on_utc()
             .map_or(0, time::UtcDateTime::unix_timestamp),
         ws_url: &format!("{}://{host}/uploads/{id}/ws", wss_method(&host)),
+        sha512: get_sha512_for_asset(id)?.unwrap_or("computing...".to_owned()),
+        sha512url: format!("/uploads/{id}/checksum.sha512"),
     };
 
     Ok(Html(template.render()?))

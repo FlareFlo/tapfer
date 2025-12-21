@@ -1,18 +1,19 @@
-use crate::error::{TapferError, TapferResult};
+use crate::error::TapferResult;
 use crate::file_meta::FileMeta;
 use crate::handlers::get_any_meta;
 use crate::tapfer_id::TapferId;
-use axum::body::Body;
 use axum::extract::Path;
 use axum::response::{IntoResponse, Response};
 use axum_extra::extract::Host;
-use futures::executor::block_on;
+use dashmap::DashSet;
 use http::StatusCode;
+use scopeguard::defer;
 use sha2::Digest;
 use std::fs::File;
-use std::io::Read;
-use std::{fs, thread};
-use tracing::error;
+use std::io::BufReader;
+use std::sync::LazyLock;
+use std::{fs, io, thread};
+use tracing::{error, info};
 
 #[utoipa::path(
 	get,
@@ -24,10 +25,10 @@ use tracing::error;
 )]
 pub async fn get_sha512sum(
     Path(path): Path<String>,
-    Host(host): Host,
+    Host(_host): Host,
 ) -> TapferResult<impl IntoResponse> {
     let ((id, _), _) = get_any_meta(&path).await?;
-    if let Some(chksum) = get_checksum_for_asset(id)? {
+    if let Some(chksum) = get_sha512_for_asset(id)? {
         Ok(Response::builder().body(chksum)?)
     } else {
         Ok(Response::builder()
@@ -36,31 +37,47 @@ pub async fn get_sha512sum(
     }
 }
 
-pub fn get_checksum_for_asset(id: TapferId) -> TapferResult<Option<String>> {
+pub fn get_sha512_for_asset(id: TapferId) -> TapferResult<Option<String>> {
     let precomputed = fs::read_to_string(format!("data/{id}/checksum.sha512"));
 
     Ok(precomputed.ok())
 }
 
+static ACTIVE_CHECKSUMS: LazyLock<DashSet<TapferId>> = LazyLock::new(|| DashSet::new());
+
 pub fn spawn_sha512_checksum(id: TapferId) {
     let core = move || {
-        let meta = block_on(FileMeta::read_from_id(id))?;
-        let mut asset = File::open(format!("data/{id}/{}", meta.name()))?;
+        let meta = FileMeta::read_from_id_blocking(id)?;
+        let mut asset = BufReader::with_capacity(
+            2_usize.pow(24),
+            File::open(format!("data/{id}/{}", meta.name()))?,
+        );
         let mut h = sha2::Sha512::new();
-        let mut buf = vec![0_u8; 2_usize.pow(30)]; // 1 GB at a time
-        while let read = asset.read(&mut buf)? {
-            Digest::update(&mut h, &buf[..read]);
-        }
-        fs::write(format!("data/{id}/checksum.sha512"), h.finalize())?;
+        let _ = io::copy(&mut asset, &mut h)?;
+        fs::write(
+            format!("data/{id}/checksum.sha512"),
+            base16ct::lower::encode_string(&h.finalize()),
+        )?;
         Ok(())
     };
+    if ACTIVE_CHECKSUMS.contains(&id) {
+        // Do not spawn another active thread
+        return;
+    }
     // Ignore handle
     let _ = thread::Builder::new()
         .name(format!("hasher_{id}"))
         .spawn(move || {
+            ACTIVE_CHECKSUMS.insert(id);
+            // Defer also runs on panic - so the map isn't poisoned when the hashing thread panics
+            defer!(if ACTIVE_CHECKSUMS.remove(&id).is_none() {
+                error!("Checksum of {id} not found in ACTIVE_CHECKSUMS");
+            });
             let res: TapferResult<()> = core();
             if let Err(e) = res {
                 error!("Failed to checksum {id} because of: {e}");
+            } else {
+                info!("Computed sha512 for {id}");
             }
         });
 }

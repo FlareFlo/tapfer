@@ -95,6 +95,10 @@ async fn main() -> TapferResult<()> {
             "/uploads/{id}/download",
             get(handlers::download::download_file),
         )
+        .route(
+            "/uploads/{id}/checksum.sha512",
+            get(handlers::checksum::get_sha512sum),
+        )
         .route("/uploads/{uuid}/ws", any(websocket::start_ws))
         .route("/qrcg/{id}", get(handlers::qrcode::get_qrcode_from_id))
         .layer(DefaultBodyLimit::disable())

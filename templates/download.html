@@ -13,6 +13,13 @@
 			background: green;
 			width: 215px;
 		}
+		#sha512 {
+            display: block;
+            width: 300px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+		}
 	</style>
 </head>
 <body>
@@ -24,6 +31,7 @@
 			<p><strong>MIME Type:</strong> {{mimetype}}</p>
 			<p id="expiry"><strong>Expires:</strong> {{expiry}}</p>
 			<p><strong>Size:</strong> {{filesize}}<span id="upload_percentage"></span></p>
+			<p id="sha512"><strong>Sha512:</strong> <a href="{{sha512url}}" target="_blank" rel="noreferrer">{{sha512}}</a></p>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<form action="{{download_url}}" method="get">

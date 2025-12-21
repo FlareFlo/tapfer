@@ -10,7 +10,7 @@ use axum::response::Html;
 use std::str::FromStr;
 use tokio::fs;
 
-mod checksum;
+pub(crate) mod checksum;
 pub mod delete;
 pub mod deposit;
 pub mod download;

@@ -111,4 +111,5 @@ pub enum WsEvent {
     UploadProgress { progress: u64, total: u64 },
     UploadComplete,
     DepositReady { id: TapferId },
+    Sha512Ready { chksum: String },
 }

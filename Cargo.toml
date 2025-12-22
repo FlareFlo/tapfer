@@ -63,5 +63,9 @@ mime = "0.3.17"
 sha2 = "0.10.9"
 base16ct = {version = "0.3.0", features = ["alloc"]}
 
+# Sha2 is unbearably slow in debug mode
+[profile.dev.package.sha2]
+opt-level = 2
+
 [features]
 dev-slow-upload  = []

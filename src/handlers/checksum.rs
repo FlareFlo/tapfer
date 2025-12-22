@@ -1,7 +1,8 @@
-use crate::error::TapferResult;
+use crate::error::{TapferErrorExt, TapferResult};
 use crate::file_meta::FileMeta;
 use crate::handlers::get_any_meta;
 use crate::tapfer_id::TapferId;
+use crate::websocket::{WsEvent, broadcast_event};
 use axum::extract::Path;
 use axum::response::{IntoResponse, Response};
 use axum_extra::extract::Host;
@@ -39,7 +40,12 @@ pub async fn get_sha512sum(
 
 pub fn get_sha512_for_asset(id: TapferId) -> TapferResult<Option<String>> {
     let precomputed = fs::read_to_string(format!("data/{id}/checksum.sha512"));
-
+    if matches!(
+        precomputed.as_ref().map_err(|e| e.kind()),
+        Err(io::ErrorKind::NotFound)
+    ) {
+        spawn_sha512_checksum(id);
+    }
     Ok(precomputed.ok())
 }
 
@@ -54,11 +60,9 @@ pub fn spawn_sha512_checksum(id: TapferId) {
         );
         let mut h = sha2::Sha512::new();
         let _ = io::copy(&mut asset, &mut h)?;
-        fs::write(
-            format!("data/{id}/checksum.sha512"),
-            base16ct::lower::encode_string(&h.finalize()),
-        )?;
-        Ok(())
+        let chksum = base16ct::lower::encode_string(&h.finalize());
+        fs::write(format!("data/{id}/checksum.sha512"), &chksum)?;
+        Ok(chksum)
     };
     if ACTIVE_CHECKSUMS.contains(&id) {
         // Do not spawn another active thread
@@ -73,11 +77,16 @@ pub fn spawn_sha512_checksum(id: TapferId) {
             defer!(if ACTIVE_CHECKSUMS.remove(&id).is_none() {
                 error!("Checksum of {id} not found in ACTIVE_CHECKSUMS");
             });
-            let res: TapferResult<()> = core();
-            if let Err(e) = res {
-                error!("Failed to checksum {id} because of: {e}");
-            } else {
-                info!("Computed sha512 for {id}");
+            let res: TapferResult<String> = core();
+            match res {
+                Ok(chksum) => {
+                    info!("Computed sha512 for {id}");
+                    broadcast_event(id, WsEvent::Sha512Ready { chksum })
+                        .log_error("Failed to broadcast event");
+                }
+                Err(e) => {
+                    error!("Failed to checksum {id} because of: {e}");
+                }
             }
         });
 }

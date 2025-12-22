@@ -13,7 +13,7 @@
 			background: green;
 			width: 215px;
 		}
-		#sha512 {
+		#sha512_box {
             display: block;
             width: 300px;
             overflow: hidden;
@@ -31,7 +31,7 @@
 			<p><strong>MIME Type:</strong> {{mimetype}}</p>
 			<p id="expiry"><strong>Expires:</strong> {{expiry}}</p>
 			<p><strong>Size:</strong> {{filesize}}<span id="upload_percentage"></span></p>
-			<p id="sha512"><strong>Sha512:</strong> <a href="{{sha512url}}" target="_blank" rel="noreferrer">{{sha512}}</a></p>
+			<p id="sha512_box"><strong>Sha512:</strong> <a id="sha512_value" href="{{sha512url}}" target="_blank" rel="noreferrer">{{sha512}}</a></p>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<form action="{{download_url}}" method="get">
@@ -100,6 +100,7 @@
 	});
 
 	let upload_percentage = document.getElementById("upload_percentage");
+    let sha512_value = document.getElementById("sha512_value");
 	ws.addEventListener("message", (e) => {
 		const payload = JSON.parse(e.data);
 		switch (payload.event.key) {
@@ -115,6 +116,9 @@
 			case "UploadComplete":
 				upload_percentage.innerText = "";
 				break;
+			case "Sha512Ready":
+                sha512_value.innerText = payload.event.chksum;
+                break;
 		}
 	});
 </script>

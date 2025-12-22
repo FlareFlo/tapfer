@@ -8,6 +8,7 @@ use std::array::TryFromSliceError;
 use std::io;
 use std::num::ParseIntError;
 use time::error::Format;
+use tracing::error;
 
 pub type TapferResult<T> = Result<T, TapferError>;
 #[derive(thiserror::Error, Debug)]
@@ -121,5 +122,17 @@ impl IntoResponse for TapferError {
 impl From<TapferError> for io::Error {
     fn from(t: TapferError) -> Self {
         io::Error::new(io::ErrorKind::InvalidData, t.to_string())
+    }
+}
+
+pub trait TapferErrorExt {
+    fn log_error(self, message: &str);
+}
+impl<T> TapferErrorExt for Result<T, TapferError> {
+    /// Drop the error by logging it
+    fn log_error(self, message: &str) {
+        if let Err(err) = self {
+            error!("{message} {err}");
+        }
     }
 }

@@ -1,6 +1,7 @@
 use qrcode_generator::QrCodeEcc;
 
 // Quick helper for easier to read sizes
+#[macro_export]
 macro_rules! size {
     ($val:literal) => {
         $val

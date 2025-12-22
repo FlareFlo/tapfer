@@ -1,6 +1,7 @@
 use crate::error::{TapferErrorExt, TapferResult};
 use crate::file_meta::FileMeta;
 use crate::handlers::get_any_meta;
+use crate::size;
 use crate::tapfer_id::TapferId;
 use crate::websocket::{WsEvent, broadcast_event};
 use axum::extract::Path;
@@ -55,7 +56,7 @@ pub fn spawn_sha512_checksum(id: TapferId) {
     let core = move || {
         let meta = FileMeta::read_from_id_blocking(id)?;
         let mut asset = BufReader::with_capacity(
-            2_usize.pow(24),
+            size!(100 M),
             File::open(format!("data/{id}/{}", meta.name()))?,
         );
         let mut h = sha2::Sha512::new();

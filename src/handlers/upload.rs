@@ -1,7 +1,7 @@
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::handlers::checksum;
 use crate::retention_control::delete_asset;
-use crate::structs::error::{TapferError, TapferResult};
+use crate::structs::error::{TapferError, TapferErrorExt, TapferResult};
 use crate::structs::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
@@ -267,16 +267,14 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for UpdownWriter<S> {
                 match handle.write_fsm().await.add_progress(n) {
                     Ok(current_progress) => {
                         let total_size = handle.file_meta().size();
-                        let e = websocket::broadcast_event(
+                        websocket::broadcast_event(
                             handle.id(),
                             WsEvent::UploadProgress {
                                 progress: current_progress,
                                 total: total_size,
                             },
-                        );
-                        if let Err(e) = e {
-                            error!("error broadcasting: {:?}", e);
-                        }
+                        )
+                        .log_error("Error broadcasting event");
                     }
                     Err(_) => {
                         error!("Failed to add progress, fsm is already marked as completed?");

@@ -1,5 +1,5 @@
 pub(crate) use crate::GLOBAL_RETENTION_POLICY;
-use crate::structs::error::TapferResult;
+use crate::structs::error::{TapferErrorExt, TapferResult};
 use crate::structs::file_meta::FileMeta;
 use crate::structs::tapfer_id::TapferId;
 use crate::websocket::WsEvent;
@@ -37,9 +37,8 @@ pub async fn check_against_global_retention(
 }
 
 pub async fn delete_asset(asset: TapferId) -> TapferResult<()> {
-    if let Err(e) = websocket::broadcast_event(asset, WsEvent::DeleteAsset) {
-        error!("Failed to broadcast deletion event: {}", e);
-    }
+    websocket::broadcast_event(asset, WsEvent::DeleteAsset)
+        .log_error("Failed to broadcast deletion event");
     fs::remove_dir_all(format!("data/{asset}")).await?;
     Ok(())
 }

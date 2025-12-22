@@ -13,6 +13,7 @@ use crate::configuration::MAX_UPLOAD_SIZE;
 use crate::handlers::deposit;
 use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
+use crate::structs::error::TapferErrorExt;
 use crate::updown::upload_pool::UploadPool;
 use axum::routing::{any, get_service};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
@@ -117,10 +118,7 @@ async fn main() -> TapferResult<()> {
         loop {
             // TODO: Handle errors in a better way
             info!("Checking for stale assets");
-            let e = check_all_assets().await;
-            if e.is_err() {
-                error!("Checking assets failed: {:?}", e);
-            }
+            check_all_assets().await.log_error("Checking assets failed");
 
             sleep(Duration::from_secs_f64(
                 GLOBAL_RETENTION_POLICY.recheck_interval.as_seconds_f64(),

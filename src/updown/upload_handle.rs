@@ -1,6 +1,6 @@
 use crate::UPLOAD_POOL;
-use crate::file_meta::FileMeta;
-use crate::tapfer_id::TapferId;
+use crate::structs::file_meta::FileMeta;
+use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_pool::{UploadFsm, UploadPool};
 use std::sync::Arc;
 use tokio::sync::{Notify, RwLock};

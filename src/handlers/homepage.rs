@@ -1,6 +1,6 @@
 use crate::configuration::{EMBED_DESCRIPTION, FAVICON, QR_CODE_SIZE};
-use crate::error::TapferResult;
 use crate::handlers::qrcode::random_base64_qr_from_id;
+use crate::structs::error::TapferResult;
 use askama::Template;
 use axum::response::{Html, IntoResponse};
 use axum_extra::extract::Host;

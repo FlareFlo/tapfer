@@ -1,9 +1,9 @@
 use crate::configuration::UPLOAD_BUFSIZE;
-use crate::error::{TapferError, TapferResult};
-use crate::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
 use crate::handlers::checksum;
 use crate::retention_control::delete_asset;
-use crate::tapfer_id::TapferId;
+use crate::structs::error::{TapferError, TapferResult};
+use crate::structs::file_meta::{FileMeta, FileMetaBuilder, RemovalPolicy};
+use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use crate::websocket::WsEvent;

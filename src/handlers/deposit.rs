@@ -1,5 +1,5 @@
 use crate::configuration::{EMBED_DESCRIPTION, FAVICON, QR_CODE_ECC, QR_CODE_SIZE};
-use crate::error::TapferResult;
+use crate::structs::error::TapferResult;
 use crate::websocket::wss_method;
 use askama::Template;
 use axum::extract::{Query, WebSocketUpgrade};

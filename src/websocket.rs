@@ -1,5 +1,5 @@
-use crate::error::TapferResult;
-use crate::tapfer_id::TapferId;
+use crate::structs::error::TapferResult;
+use crate::structs::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, WebSocketUpgrade};
 use axum::response::Response;

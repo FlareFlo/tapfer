@@ -1,7 +1,7 @@
 pub(crate) use crate::GLOBAL_RETENTION_POLICY;
-use crate::error::TapferResult;
-use crate::file_meta::FileMeta;
-use crate::tapfer_id::TapferId;
+use crate::structs::error::TapferResult;
+use crate::structs::file_meta::FileMeta;
+use crate::structs::tapfer_id::TapferId;
 use crate::websocket::WsEvent;
 use crate::{UPLOAD_POOL, websocket};
 use std::ops::Add;

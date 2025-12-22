@@ -1,5 +1,5 @@
-use crate::error::{TapferError, TapferResult};
-use crate::tapfer_id::TapferId;
+use crate::structs::error::{TapferError, TapferResult};
+use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use dashmap::DashMap;
 

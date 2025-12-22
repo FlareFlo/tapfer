@@ -1,11 +1,11 @@
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
-use crate::error::{TapferError, TapferResult};
-use crate::file_meta::{FileMeta, RemovalPolicy};
 use crate::handlers;
 use crate::handlers::checksum::get_sha512_for_asset;
 use crate::handlers::qrcode::base64_qr_from_id;
 use crate::retention_control::delete_asset;
-use crate::tapfer_id::TapferId;
+use crate::structs::error::{TapferError, TapferResult};
+use crate::structs::file_meta::{FileMeta, RemovalPolicy};
+use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use crate::websocket::wss_method;

@@ -1,8 +1,8 @@
-use crate::error::{TapferErrorExt, TapferResult};
-use crate::file_meta::FileMeta;
 use crate::handlers::get_any_meta;
 use crate::size;
-use crate::tapfer_id::TapferId;
+use crate::structs::error::{TapferErrorExt, TapferResult};
+use crate::structs::file_meta::FileMeta;
+use crate::structs::tapfer_id::TapferId;
 use crate::websocket::{WsEvent, broadcast_event};
 use axum::extract::Path;
 use axum::response::{IntoResponse, Response};

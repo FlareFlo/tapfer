@@ -1,4 +1,4 @@
-use crate::error::TapferError;
+use crate::structs::error::TapferError;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use uuid::Uuid;

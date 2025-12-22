@@ -1,8 +1,8 @@
 use crate::updown::upload_pool::UploadFsm;
 use axum::extract::multipart::MultipartError;
-use axum::http::StatusCode;
-use axum::http::header::{InvalidHeaderValue, ToStrError};
 use axum::response::{Html, IntoResponse, Response};
+use http::StatusCode;
+use http::header::{InvalidHeaderValue, ToStrError};
 use qrcode_generator::QRCodeError;
 use std::array::TryFromSliceError;
 use std::io;
@@ -11,6 +11,7 @@ use time::error::Format;
 use tracing::error;
 
 pub type TapferResult<T> = Result<T, TapferError>;
+
 #[derive(thiserror::Error, Debug)]
 pub enum TapferError {
     #[error("multipart form had fields after the file")]
@@ -89,6 +90,8 @@ impl IntoResponse for TapferError {
         ).into_response()
         };
         use TapferError::*;
+        use axum::response::Html;
+        use http::StatusCode;
         match self {
             BadMultipartOrder => generic("multipart order"),
             UnknownMultipartField { .. } => generic("unknown multipart field"),
@@ -128,6 +131,7 @@ impl From<TapferError> for io::Error {
 pub trait TapferErrorExt {
     fn log_error(self, message: &str);
 }
+
 impl<T> TapferErrorExt for Result<T, TapferError> {
     /// Drop the error by logging it
     fn log_error(self, message: &str) {

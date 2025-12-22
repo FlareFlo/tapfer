@@ -1,7 +1,7 @@
 use crate::configuration::{QR_CODE_ECC, QR_CODE_SIZE};
-use crate::error::TapferResult;
 use crate::handlers::get_any_meta;
-use crate::tapfer_id::TapferId;
+use crate::structs::error::TapferResult;
+use crate::structs::tapfer_id::TapferId;
 use axum::body::Body;
 use axum::extract::Path;
 use axum::response::IntoResponse;

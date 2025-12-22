@@ -1,5 +1,5 @@
-use crate::error::{TapferError, TapferResult};
-use crate::tapfer_id::TapferId;
+use crate::structs::error::{TapferError, TapferResult};
+use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use std::path::Path;
 use std::str::FromStr;
@@ -15,6 +15,7 @@ pub struct FileMeta {
     removal_policy: RemovalPolicy,
     mimetype: String,
 }
+
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum RemovalPolicy {
     SingleDownload,
@@ -48,6 +49,7 @@ impl FileSize {
         }
     }
 }
+
 impl FileMeta {
     pub fn remove_after_download(&self) -> bool {
         matches!(self.removal_policy, RemovalPolicy::SingleDownload)

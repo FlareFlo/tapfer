@@ -76,7 +76,7 @@ pub async fn accept_form(
         host = host.replace("cdn.", "");
         "https://"
     };
-    Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}")))
+    Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")))
 }
 
 async fn do_upload(

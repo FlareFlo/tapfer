@@ -22,7 +22,7 @@
     input[type="file"] {
     }
 
-    input[type="submit"], button {
+    input[type="submit"], button, .button {
         padding: 0.6rem;
         background-color: #4F46E5;
         color: white;
@@ -32,9 +32,12 @@
         cursor: pointer;
         transition: filter 0.3s ease;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+		/*Fixes for anchor element buttons*/
+        text-decoration: none;
+        line-height: 1;
     }
 
-    input[type="submit"]:hover, button:hover {
+    input[type="submit"]:hover, button:hover, .button:hover {
 		filter: brightness(1.2);
     }
 

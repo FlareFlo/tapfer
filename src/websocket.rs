@@ -1,3 +1,4 @@
+use crate::handlers::is_localhost;
 use crate::structs::error::TapferResult;
 use crate::structs::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
@@ -52,10 +53,7 @@ pub fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> 
 }
 
 pub fn wss_method(host: &str) -> &str {
-    match host {
-        "localhost:3000" => "ws",
-        _ => "wss",
-    }
+    if is_localhost(host) { "ws" } else { "wss" }
 }
 
 // Impl

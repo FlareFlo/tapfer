@@ -1,6 +1,7 @@
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::handlers;
 use crate::handlers::checksum::get_sha512_for_asset;
+use crate::handlers::is_localhost;
 use crate::handlers::qrcode::base64_qr_from_id;
 use crate::retention_control::delete_asset;
 use crate::structs::error::{TapferError, TapferResult};
@@ -61,10 +62,15 @@ pub async fn download_html(
         RemovalPolicy::Expiry { .. } => meta.expires_on_utc().unwrap().format(&DES)?.clone(),
     };
 
+    let localhost = is_localhost(&host);
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
-        download_url: &format!("https://cdn.{host}/uploads/{id}/download"),
+        download_url: if !localhost {
+            &format!("https://cdn.{host}/uploads/{id}/download")
+        } else {
+            &format!("http://localhost/uploads/{id}/download")
+        },
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)

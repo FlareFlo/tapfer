@@ -7,6 +7,7 @@ use crate::structs::tapfer_id::TapferId;
 use askama::Template;
 use axum::http::StatusCode;
 use axum::response::Html;
+use axum_extra::extract::Host;
 use std::str::FromStr;
 use tokio::fs;
 
@@ -57,4 +58,8 @@ async fn get_any_meta(path: &String) -> TapferResult<((TapferId, FileMeta), UpDo
         }
     };
     Ok(res)
+}
+
+pub fn is_localhost(host: &str) -> bool {
+    host.starts_with("localhost") || host.starts_with("127.0.0.1")
 }

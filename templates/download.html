@@ -45,6 +45,8 @@
 </div>
 
 <script>
+    {% include "components/ws_shutdown_listener.js" %}
+
 	const copy_link = document.getElementById('copy_link');
 	copy_link.addEventListener('click', async () => {
 		try {
@@ -119,6 +121,7 @@
                 break;
 		}
 	});
+    ws_shutdown_listener(ws);
 </script>
 </body>
 </html>

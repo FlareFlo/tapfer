@@ -14,10 +14,11 @@ use uuid::Uuid;
 
 static WS_MAP: LazyLock<DashMap<WsDestination, WeakSender<WsEvent>>> = LazyLock::new(DashMap::new);
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Copy, Clone)]
 pub enum WsDestination {
     Id(TapferId),
     Deposit(u64),
+    All,
 }
 
 impl From<TapferId> for WsDestination {
@@ -34,6 +35,12 @@ impl From<u64> for WsDestination {
 
 // Public API for other handlers to use
 pub fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> TapferResult<()> {
+    if dst.into() == WsDestination::All {
+        for ws in WS_MAP.iter() {
+            ws.value().upgrade().map(|w|w.send(event.clone()));
+        }
+    }
+
     // Check if someone's listening
     let Some(rx) = WS_MAP.get(&dst.into()) else {
         if matches!(dst.into(), WsDestination::Deposit(_)) {
@@ -110,4 +117,5 @@ pub enum WsEvent {
     UploadComplete,
     DepositReady { id: TapferId },
     Sha512Ready { chksum: String },
+    Shutdown,
 }

@@ -7,6 +7,8 @@ mod structs;
 mod updown;
 mod websocket;
 
+use std::process;
+use std::thread;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -35,6 +37,7 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
+use crate::websocket::{WsDestination, WsEvent};
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
@@ -44,8 +47,9 @@ pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 #[tokio::main]
 async fn main() -> TapferResult<()> {
     ctrlc::set_handler(move || {
-        error!("Caught CTRL-C... Exiting right away");
-        std::process::exit(1);
+        let _ = websocket::broadcast_event(WsDestination::All, WsEvent::Shutdown);
+        thread::sleep(Duration::from_secs(1));
+        process::exit(1);
     })
     .expect("Error setting Ctrl-C handler");
 

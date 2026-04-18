@@ -115,8 +115,19 @@
     const fileinput = document.getElementById("file_input");
 
     copylink_button.addEventListener("click", () => {
-		navigator.clipboard.writeText(download_url.href);
-        show_toast("Copied to clipboard!", "success");
+        let copy_to_clipboard = () => {
+            navigator.clipboard.writeText(download_url.href);
+            show_toast("Copied to clipboard!", "success");
+		};
+
+        // Delay copy action until it is ready
+        if (download_url.href.endsWith("unset")) {
+            setTimeout(() => {
+                copy_to_clipboard();
+			}, 1000);
+		} else {
+            copy_to_clipboard();
+		}
 	});
 
     // Prevent default actions

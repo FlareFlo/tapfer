@@ -33,7 +33,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::cors::{AllowOrigin, Any};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
@@ -48,6 +48,7 @@ pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);
 async fn main() -> TapferResult<()> {
     ctrlc::set_handler(move || {
         let _ = websocket::broadcast_event(WsDestination::All, WsEvent::Shutdown);
+        warn!("Shutting down in 1000ms");
         thread::sleep(Duration::from_secs(1));
         process::exit(1);
     })

@@ -28,7 +28,7 @@ use tokio::fs::File;
 use tokio::select;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[derive(Template)]
 #[template(path = "download.html")]
@@ -69,7 +69,7 @@ pub async fn download_html(
         download_url: if !localhost {
             &format!("https://cdn.{host}/uploads/{id}/download")
         } else {
-            &format!("http://localhost/uploads/{id}/download")
+            &format!("http://localhost:3000/uploads/{id}/download")
         },
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
@@ -151,6 +151,7 @@ struct DownloadStream {
     meta: FileMeta,
     id: TapferId,
     fsm: UpDownFsm,
+    downloaded_bytes: u64,
 }
 
 /// FSM describing the state of a possibly ongoing upload
@@ -176,6 +177,7 @@ impl DownloadStream {
             meta,
             id,
             fsm,
+            downloaded_bytes: 0,
         }
     }
 }
@@ -191,8 +193,12 @@ impl Drop for DownloadStream {
         let meta = self.meta.clone();
         let id = self.id;
 
-        tokio::spawn(async move {
-            if meta.remove_after_download() {
+        if meta.remove_after_download() {
+            if meta.size() != self.downloaded_bytes {
+                warn!("Not removing {id} as this download filed");
+                return;
+            }
+            tokio::spawn(async move {
                 info!("Removing {id} as its download has completed");
                 match delete_asset(id).await {
                     Ok(()) => {}
@@ -200,8 +206,8 @@ impl Drop for DownloadStream {
                         error!("Failed to delete {id} because {e:?}");
                     }
                 }
-            }
-        });
+            });
+        }
     }
 }
 
@@ -267,6 +273,7 @@ impl futures_core::Stream for DownloadStream {
         let poll_res = self.inner.poll_next_unpin(cx);
         if let Poll::Ready(Some(Ok(b))) = &poll_res {
             self.fsm.add_progress(b.len() as u64);
+            self.downloaded_bytes += b.len() as u64;
         }
         poll_res
     }

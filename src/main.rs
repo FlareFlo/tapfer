@@ -7,8 +7,6 @@ mod structs;
 mod updown;
 mod websocket;
 
-use std::process;
-use std::thread;
 use crate::api_doc::ApiDoc;
 use crate::case_insensitive_path::lowercase_path_middleware;
 use crate::configuration::MAX_UPLOAD_SIZE;
@@ -17,12 +15,15 @@ use crate::handlers::upload;
 use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::structs::error::TapferErrorExt;
 use crate::updown::upload_pool::UploadPool;
+use crate::websocket::{WsDestination, WsEvent};
 use axum::routing::{any, get_service};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
 use http::HeaderValue;
+use std::process;
 use std::sync::LazyLock;
+use std::thread;
 use std::time::Duration;
 use std::{env, fs};
 use structs::error::TapferResult;
@@ -37,7 +38,6 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
-use crate::websocket::{WsDestination, WsEvent};
 
 pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =

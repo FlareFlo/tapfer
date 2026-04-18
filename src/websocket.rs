@@ -37,7 +37,7 @@ impl From<u64> for WsDestination {
 pub fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> TapferResult<()> {
     if dst.into() == WsDestination::All {
         for ws in WS_MAP.iter() {
-            ws.value().upgrade().map(|w|w.send(event.clone()));
+            ws.value().upgrade().map(|w| w.send(event.clone()));
         }
     }
 

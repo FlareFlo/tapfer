@@ -52,6 +52,9 @@
 		try {
 			await navigator.clipboard.writeText("{{download_url}}");
 			copy_link.innerText = "Copied!";
+            setTimeout(() => {
+                copy_link.innerText = "Copy direct download link";
+			}, 3000);
 		} catch (err) {
 			console.error('Failed to copy: ', err);
 		}

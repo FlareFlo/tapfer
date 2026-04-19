@@ -9,7 +9,7 @@ use crate::structs::file_meta::{FileMeta, RemovalPolicy};
 use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
-use crate::websocket::wss_method;
+use crate::websocket::{broadcast_event, wss_method, WsEvent};
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
@@ -25,7 +25,8 @@ use std::time::Duration;
 use time::format_description::BorrowedFormatItem;
 use time::macros::format_description;
 use tokio::fs::File;
-use tokio::select;
+use tokio::{select, task};
+use tokio::time::sleep;
 use tokio_util::bytes::Bytes;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info, warn};
@@ -45,7 +46,7 @@ struct DownloadTemplate<'a> {
     qr_b64: String,
     unix_expiry: i64,
     ws_url: &'a str,
-    sha512: String,
+    sha512: &'a str,
     sha512url: String,
 }
 
@@ -63,6 +64,7 @@ pub async fn download_html(
     };
 
     let localhost = is_localhost(&host);
+    let sha512 = get_sha512_for_asset(id)?;
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
@@ -88,7 +90,7 @@ pub async fn download_html(
             .expires_on_utc()
             .map_or(0, time::UtcDateTime::unix_timestamp),
         ws_url: &format!("{}://{host}/uploads/{id}/ws", wss_method(&host)),
-        sha512: get_sha512_for_asset(id)?.unwrap_or("computing...".to_owned()),
+        sha512: sha512.as_deref().unwrap_or("computing..."),
         sha512url: format!("/uploads/{id}/checksum.sha512"),
     };
 

@@ -15,6 +15,9 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::LazyLock;
 use std::{fs, io, thread};
+use std::ops::Not;
+use std::thread::sleep;
+use std::time::Duration;
 use tracing::{error, info};
 
 #[utoipa::path(
@@ -65,15 +68,14 @@ pub fn spawn_sha512_checksum(id: TapferId) {
         fs::write(format!("data/{id}/checksum.sha512"), &chksum)?;
         Ok(chksum)
     };
-    if ACTIVE_CHECKSUMS.contains(&id) {
-        // Do not spawn another active thread
+    let already_inserted = ACTIVE_CHECKSUMS.insert(id).not();
+    if already_inserted {
         return;
     }
     // Ignore handle
     let _ = thread::Builder::new()
         .name(format!("hasher_{id}"))
         .spawn(move || {
-            ACTIVE_CHECKSUMS.insert(id);
             // Defer also runs on panic - so the map isn't poisoned when the hashing thread panics
             defer!(if ACTIVE_CHECKSUMS.remove(&id).is_none() {
                 error!("Checksum of {id} not found in ACTIVE_CHECKSUMS");
@@ -82,6 +84,10 @@ pub fn spawn_sha512_checksum(id: TapferId) {
             match res {
                 Ok(chksum) => {
                     info!("Computed sha512 for {id}");
+                    broadcast_event(id, WsEvent::Sha512Ready { chksum: chksum.clone() })
+                        .log_error("Failed to broadcast event");
+                    // Broadcast a 2nd time to avoid racy loads
+                    sleep(Duration::from_secs(1));
                     broadcast_event(id, WsEvent::Sha512Ready { chksum })
                         .log_error("Failed to broadcast event");
                 }

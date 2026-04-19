@@ -34,7 +34,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::cors::{AllowOrigin, Any};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::ServeDir;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};

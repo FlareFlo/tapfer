@@ -13,11 +13,11 @@ use scopeguard::defer;
 use sha2::Digest;
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::LazyLock;
-use std::{fs, io, thread};
 use std::ops::Not;
+use std::sync::LazyLock;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{fs, io, thread};
 use tracing::{error, info};
 
 #[utoipa::path(
@@ -84,8 +84,13 @@ pub fn spawn_sha512_checksum(id: TapferId) {
             match res {
                 Ok(chksum) => {
                     info!("Computed sha512 for {id}");
-                    broadcast_event(id, WsEvent::Sha512Ready { chksum: chksum.clone() })
-                        .log_error("Failed to broadcast event");
+                    broadcast_event(
+                        id,
+                        WsEvent::Sha512Ready {
+                            chksum: chksum.clone(),
+                        },
+                    )
+                    .log_error("Failed to broadcast event");
                     // Broadcast a 2nd time to avoid racy loads
                     sleep(Duration::from_secs(1));
                     broadcast_event(id, WsEvent::Sha512Ready { chksum })

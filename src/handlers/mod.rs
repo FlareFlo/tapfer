@@ -7,7 +7,6 @@ use crate::structs::tapfer_id::TapferId;
 use askama::Template;
 use axum::http::StatusCode;
 use axum::response::Html;
-use axum_extra::extract::Host;
 use std::str::FromStr;
 use tokio::fs;
 

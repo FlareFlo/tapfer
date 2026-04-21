@@ -96,7 +96,7 @@
 			<div class="hide-on-mobile">
 				Or use CURL <br>
 				<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;">curl -X POST https://example.com<span class="show_deposit_mode">?deposit={deposit_id}</span> -F file=@</code><code style="color: #00e2ff; !important; user-select: none; padding: 0.2rem 0.2rem 0.2rem 0;">$FILEPATH</code>
-				<script>const loc = window.location.origin; const fmt = `curl -X POST ${loc} -F file=@`; document.getElementById("curl_command").innerText = fmt</script>
+				<script>const loc = window.location.origin; const cdn_prefix = loc.includes("localhost:3000") ? "" : "cdn."; const fmt = `curl -X POST ${cdn_prefix}${loc} -F file=@`; document.getElementById("curl_command").innerText = fmt</script>
 			</div>
 
 			<div id="progress_text" class="show_on_upload">0MB/0MB 0MB/s</div>

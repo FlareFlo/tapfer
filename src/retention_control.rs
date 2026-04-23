@@ -4,12 +4,12 @@ use crate::structs::file_meta::FileMeta;
 use crate::structs::tapfer_id::TapferId;
 use crate::websocket::WsEvent;
 use crate::{UPLOAD_POOL, websocket};
-use std::ops::Add;
+use std::ops::{Add, Not};
 use std::str::FromStr;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
-use tracing::{error, info};
+use tracing::{info};
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,
@@ -29,7 +29,7 @@ pub async fn check_against_global_retention(
     (id, meta): (TapferId, FileMeta),
     now: UtcDateTime,
 ) -> TapferResult<()> {
-    if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) > now {
+    if meta.created().add(GLOBAL_RETENTION_POLICY.maximum_age) < now {
         info!("Deleting {id} as it has expired");
         delete_asset(id).await?;
     }
@@ -46,20 +46,28 @@ pub async fn delete_asset(asset: TapferId) -> TapferResult<()> {
 pub async fn check_all_assets() -> TapferResult<()> {
     let now = UtcDateTime::now();
     let mut dir = fs::read_dir("data").await?;
-    #[allow(for_loops_over_fallibles)]
-    for entry in dir.next_entry().await? {
-        // Skip cachedir tag etc.
-        if entry.path().is_file() {
+    while let Some(entry) =  dir.next_entry().await? {
+        let file_meta = match entry.metadata().await {
+            Ok(m) => m,
+            e => {
+                e.log_error("Failed to get metadata");
+                continue;
+            }
+        };
+        // Skip cachedir tag
+        if file_meta.is_dir().not() {
             continue;
         }
+        let mut path = entry.path().to_path_buf();
+        path.push("meta.toml");
+        let id = match TapferId::from_str(&entry.file_name().to_string_lossy()) {
+            Ok(t) => {t}
+            e => {e.log_error(&format!("Failed get ID from {}", path.display())); continue}
+        };
 
-        if let Ok(meta) = FileMeta::read_from_id_path(&entry.path()).await {
-            check_against_global_retention(meta, now).await?;
+        if let Ok(meta) = FileMeta::read_from_id(id).await {
+            check_against_global_retention((id, meta), now).await?;
         } else {
-            let id = TapferId::from_str(&entry.path().to_string_lossy()).inspect_err(|_| {
-                error!("Failed to check asset {entry:?}");
-            })?;
-
             // Only delete element if it isn't in progress
             if !UPLOAD_POOL.uploads.contains_key(&id) {
                 // Delete asset straight up when metadata is missing or corrupt

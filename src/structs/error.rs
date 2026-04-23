@@ -5,6 +5,7 @@ use http::StatusCode;
 use http::header::{InvalidHeaderValue, ToStrError};
 use qrcode_generator::QRCodeError;
 use std::array::TryFromSliceError;
+use std::fmt::Display;
 use std::io;
 use std::num::ParseIntError;
 use time::error::Format;
@@ -132,7 +133,7 @@ pub trait TapferErrorExt {
     fn log_error(self, message: &str);
 }
 
-impl<T> TapferErrorExt for Result<T, TapferError> {
+impl<T, E: Display> TapferErrorExt for Result<T, E> {
     /// Drop the error by logging it
     fn log_error(self, message: &str) {
         if let Err(err) = self {

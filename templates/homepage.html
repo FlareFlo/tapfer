@@ -198,11 +198,6 @@
         // We handle the entire request ourselves
         e.preventDefault();
 
-        // Generate any random 32 bit integer
-        const array = new Uint32Array(1);
-        window.crypto.getRandomValues(array);
-        const random_seed =  array[0];
-
         const fileInput = form.querySelector('input[name="file"]');
         const file = fileInput.files[0];
         if (!file) return;
@@ -231,7 +226,6 @@
 
         const params = new URLSearchParams({
             "file_size": totalEncryptedSize,
-            "progress_token": random_seed.toString(),
             "expiration": formDataParams.get("expiration"),
             "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
             "filename": file.name
@@ -250,16 +244,26 @@
         const speedSamples = [];
         const maxSamples = 300;
 
-        let currentChunk = 0;
         let uploadedBytes = 0;
-        let fired = false;
-        let sent = Date.now();
 
-        const stream = new ReadableStream({
-            async pull(controller) {
+        const show_elems = document.getElementsByClassName("show_on_upload");
+        for (const elem of show_elems) {
+            elem.style.visibility = "unset";
+		}
+
                 try {
-                    if (currentChunk < totalChunks) {
-                        // Read, encrypt, and push ONLY a 1MB chunk to the network buffer
+            const initRes = await fetch(`${cdnUrl}/upload/init?${params.toString()}`, { method: 'POST' });
+            if (!initRes.ok) throw new Error("Initialization failed");
+            const uploadId = await initRes.text();
+
+            const fileUrl = `/uploads/${uploadId}#${secretString}`;
+            download_url.href = fileUrl;
+            download_url.innerText = "Encrypted Link Ready";
+            const qrcode = document.getElementById('qrcode');
+            qrcode.src = `/qrcg/${encodeURIComponent(fileUrl)}`;
+            qrcode.style.filter = 'none';
+
+            for (let currentChunk = 0; currentChunk < totalChunks; currentChunk++) {
                         const start = currentChunk * CHUNK_SIZE;
                         const end = Math.min(start + CHUNK_SIZE, file.size);
                         const chunkBlob = file.slice(start, end);
@@ -268,10 +272,17 @@
                         const isLast = (currentChunk === totalChunks - 1);
 
                         const encrypted = encrypter.encrypt_chunk(chunk, isLast);
-                        controller.enqueue(encrypted);
+
+                const chunkRes = await fetch(`${cdnUrl}/uploads/${uploadId}/chunk`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/octet-stream' },
+                    body: encrypted
+                });
+
+                if (!chunkRes.ok) throw new Error("Chunk upload failed");
+
                         uploadedBytes += encrypted.length;
 
-                        // Calculate Progress
                         const percent = (uploadedBytes / totalEncryptedSize) * 100;
                         background.style.backgroundSize = percent + '% 100%';
                         percentageElement.innerText = `${percent.toFixed(1)}%`;
@@ -288,61 +299,20 @@
                         progresstext.innerText = `${(uploadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalEncryptedSize / 1024 / 1024).toFixed(1)}MB ${(averageSpeed / 1024 / 1024).toFixed(1)}MB/s`;
                         last_progress = now;
                         last_loaded = uploadedBytes;
-
-                        // Fire Token Request
-                        if (!fired && (Date.now() - sent) > 1000) {
-                            fired = true;
-                            const token_xhr = new XMLHttpRequest();
-                            token_xhr.open('GET', `/uploads/query_id/${random_seed}`, true);
-                            token_xhr.onload = async function () {
-                                if (token_xhr.status >= 200 && token_xhr.status < 300) {
-                                    const url = `/uploads/${token_xhr.responseText}#${secretString}`;
-                                    download_url.href = url;
-                                    download_url.innerText = "Encrypted Link Ready";
-                                    const qrcode = document.getElementById('qrcode');
-                                    // Encode URL so the # isn't truncated by the browser's router
-                                    qrcode.src = `/qrcg/${encodeURIComponent(url)}`;
-                                    qrcode.style.filter = 'none';
-                                }
-                            };
-                            token_xhr.send();
                         }
-                        currentChunk++;
-                    } else {
-                        controller.close();
-                        encrypter.free();
-                    }
-                } catch (err) {
-                    controller.error(err);
                     encrypter.free();
-                    show_toast("Encryption failed: " + err.toString(), "error");
-                }
-            }
-        });
 
-        const show_elems = document.getElementsByClassName("show_on_upload");
-        for (const elem of show_elems) {
-            elem.style.visibility = "unset";
-		}
+            const finRes = await fetch(`${cdnUrl}/uploads/${uploadId}/finalize`, { method: 'POST' });
 
-        try {
-            const response = await fetch(`${cdnUrl}/?${params.toString()}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/octet-stream'
-                },
-                body: stream,
-                duplex: 'half'
-            });
-
-            if (response.ok) {
-                const responseText = await response.text();
+            if (finRes.ok) {
+                const responseText = await finRes.text();
                 console.log(`redirecting to ${responseText}`);
                 window.location.href = responseText + "#" + secretString;
             } else {
-                throw new Error(`Server returned ${response.status}`);
+                throw new Error(`Server returned ${finRes.status}`);
             }
         } catch (err) {
+            try { if (typeof encrypter !== 'undefined') encrypter.free(); } catch(e) {}
             show_toast('Upload failed: ' + err.message, "error");
             background.style.backgroundSize = '0% 100%';
         }

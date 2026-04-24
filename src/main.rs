@@ -92,10 +92,9 @@ async fn main() -> TapferResult<()> {
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route("/deposit", get(deposit::show_form))
         .route("/deposit/ws", any(deposit::start_ws))
-        .route(
-            "/uploads/query_id/{token}",
-            get(handlers::upload::progress_token_to_id),
-        )
+        .route("/upload/init", axum::routing::post(handlers::upload::init_chunked_upload))
+        .route("/uploads/{id}/chunk", axum::routing::patch(handlers::upload::upload_chunk))
+        .route("/uploads/{id}/finalize", axum::routing::post(handlers::upload::finalize_chunked_upload))
         .route(
             "/uploads/{id}/download",
             get(handlers::download::download_file),

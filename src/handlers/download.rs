@@ -60,11 +60,16 @@ pub async fn download_html(
         RemovalPolicy::Expiry { .. } => meta.expires_on_utc().unwrap().format(&DES)?.clone(),
     };
 
+    let prefix = if host.contains("localhost") {
+        ""
+    } else {
+        "cdn."
+    };
     let sha512 = get_sha512_for_asset(id)?;
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
-        download_url: &format!("https://cdn.{host}/uploads/{id}/download"),
+        download_url: &format!("https://{prefix}{host}/uploads/{id}/download"),
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)

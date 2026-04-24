@@ -14,8 +14,11 @@ use axum::http::StatusCode;
 use axum::response::Html;
 use axum::response::IntoResponse;
 use axum_extra::extract::Host;
+use dashmap::DashMap;
+use futures_util::StreamExt;
 use futures_util::TryStreamExt;
 use scopeguard::defer;
+use std::sync::LazyLock;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
@@ -24,8 +27,12 @@ use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
 use tokio::{fs, task};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::io::StreamReader;
 use tracing::{error, info, warn};
+
+static CHUNKED_UPLOADS: LazyLock<DashMap<TapferId, mpsc::Sender<Result<axum::body::Bytes, std::io::Error>>>> = LazyLock::new(DashMap::new);
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
@@ -228,6 +235,94 @@ fn expiration_field(field: Option<&str>, meta: &mut FileMetaBuilder) -> TapferRe
         }
     }
     Ok(())
+}
+
+#[axum::debug_handler]
+pub async fn init_chunked_upload(
+    Query(params): Query<UploadParameters>,
+) -> TapferResult<impl IntoResponse> {
+    let id = TapferId::new_random();
+    fs::create_dir(&format!("data/{id}")).await?;
+
+    let mut meta = FileMetaBuilder::default();
+    let size = params.file_size;
+
+    if let Some(tz) = params.timezone.as_ref() {
+        meta.timezone = Some(tz.to_owned());
+    } else {
+        error!("Missing tapfer-timezone parameter");
+    }
+    expiration_field(params.expiration.as_deref(), &mut meta)?;
+
+    if let Some(deposit) = params.deposit {
+        websocket::broadcast_event(deposit, WsEvent::DepositReady { id })?;
+    }
+
+    let file_name = params.filename.clone().unwrap_or_else(|| id.to_string());
+    let content_type = mime::APPLICATION_OCTET_STREAM.as_ref().to_string();
+
+    let metadata = meta.build(file_name.clone(), content_type.clone(), size);
+    let handle = UPLOAD_POOL.handle(id, metadata.clone());
+    let f = File::create(format!("data/{id}/{file_name}")).await?;
+    let mut f = UpdownWriter::new(f, handle.clone(), metadata, size.is_none());
+
+    // Create a channel that will feed bytes to the UpdownWriter task
+    let (tx, rx) = mpsc::channel(16);
+    CHUNKED_UPLOADS.insert(id, tx);
+
+    tokio::spawn(async move {
+        let mut s = BufReader::with_capacity(
+            UPLOAD_BUFSIZE,
+            StreamReader::new(ReceiverStream::new(rx)),
+        );
+        if let Err(e) = copy_buf(&mut s, &mut f).await {
+            error!("Chunked upload error for {id}: {e}");
+            return;
+        }
+        let metadata = f.metadata();
+        if let Err(e) = fs::write(format!("data/{id}/meta.toml"), toml::to_string_pretty(&metadata).unwrap().as_bytes()).await {
+            error!("Failed to write meta for {id}: {e}");
+        }
+        handle.write_fsm().await.mark_complete();
+        let _ = websocket::broadcast_event(id, WsEvent::UploadComplete);
+        checksum::spawn_sha512_checksum(id);
+    });
+
+    Ok((StatusCode::OK, id.to_string()))
+}
+
+#[axum::debug_handler]
+pub async fn upload_chunk(
+    Path(id_str): Path<String>,
+    req: Request,
+) -> TapferResult<impl IntoResponse> {
+    let id = TapferId::from_str(&id_str)?;
+    // Using TokenDoesNotExist error for convenience as it yields a 404
+    let tx = CHUNKED_UPLOADS.get(&id).ok_or(TapferError::TokenDoesNotExist(0))?.clone();
+
+    let mut stream = req.into_body().into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        if tx.send(Ok(chunk)).await.is_err() {
+            return Err(TapferError::Custom { status_code: StatusCode::BAD_REQUEST, body: Html("Upload aborted".to_string())});
+        }
+    }
+    Ok(StatusCode::OK)
+}
+
+#[axum::debug_handler]
+pub async fn finalize_chunked_upload(
+    Path(id_str): Path<String>,
+    Host(mut host): Host,
+) -> TapferResult<impl IntoResponse> {
+    let id = TapferId::from_str(&id_str)?;
+
+    if CHUNKED_UPLOADS.remove(&id).is_none() {
+         return Err(TapferError::Custom { status_code: StatusCode::NOT_FOUND, body: Html("Upload session not found".to_string()) });
+    }
+
+    let method = if host.contains("localhost") { host = String::new(); "" } else { host = host.replace("cdn.", ""); "https://" };
+    Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")))
 }
 
 #[utoipa::path(

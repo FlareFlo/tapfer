@@ -96,7 +96,7 @@
             const decryptionTransformer = new TransformStream({
                 start() {
                     // Each original 1MB chunk has a 16-byte tag appended by the encryptor.
-                    this.CHUNK_SIZE = 1024 * 1024;
+                    this.CHUNK_SIZE = 1024 * 1024 * 10;
                     this.ENCRYPTED_CHUNK_SIZE = this.CHUNK_SIZE + 16;
                     this.buffer = new Uint8Array(0);
                 },

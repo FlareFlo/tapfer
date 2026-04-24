@@ -211,7 +211,7 @@
         combinedSecret.set(nonce, 32);
         const secretString = encodeBase64Url(combinedSecret);
 
-        const CHUNK_SIZE = 1024 * 1024;
+        const CHUNK_SIZE = 1024 * 1024 * 10;
         const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
         const totalEncryptedSize = file.size + (totalChunks * 16);
         

@@ -36,6 +36,7 @@ struct DownloadTemplate<'a> {
     download_url: &'a str,
     mimetype: &'a str,
     filesize: &'a str,
+    file_size_bits: u64,
     embed_image_url: &'a str,
     qr_size: usize,
     embed_description: &'a str,
@@ -78,6 +79,7 @@ pub async fn download_html(
         } else {
             &human_bytes(meta.size() as f64)
         },
+        file_size_bits: meta.known_size().unwrap_or(0),
         embed_image_url: &format!("/qrcg/{id}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,

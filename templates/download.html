@@ -69,13 +69,15 @@
         // prevent reload before download is complete
         window.is_downloading = true;
 
-        downloadButton.innerText = "Decrypting...";
+        downloadButton.innerText = "Decrypting";
         downloadButton.disabled = true;
 
         try {
             await init();
 
             let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+            const file_size = {{file_size_bits}};
+            let progress = 0;
             while (base64.length % 4) { base64 += '='; }
             const binaryString = atob(base64);
             const combined = new Uint8Array(binaryString.length);
@@ -113,6 +115,8 @@
                         this.buffer = this.buffer.slice(this.ENCRYPTED_CHUNK_SIZE);
                         const decrypted = decrypter.decrypt_chunk(chunkToDecrypt, false);
                         controller.enqueue(decrypted);
+                        downloadButton.innerText = `Decrypting ${progress / file_size * 100}%`;
+                        progress += this.ENCRYPTED_CHUNK_SIZE;
                     }
                 },
                 flush(controller) {

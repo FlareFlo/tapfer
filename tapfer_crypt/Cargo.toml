@@ -8,7 +8,10 @@ version = "0.0.0"
 crate-type = ["cdylib"]
 
 [dependencies]
+chacha20poly1305 = {version = "0.10.1", features = ["std", "stream"]}
+getrandom = { version = "0.2.7", features = ["js"]} # Override chacha20poly1305 default getrandom with JS feature
 wasm-bindgen = "*"
+
 
 [dependencies.web-sys]
 features = ['Document', 'Element', 'HtmlElement', 'Node', 'Window']

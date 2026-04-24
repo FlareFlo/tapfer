@@ -16,7 +16,7 @@ use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::structs::error::TapferErrorExt;
 use crate::updown::upload_pool::UploadPool;
 use crate::websocket::{WsDestination, WsEvent};
-use axum::routing::{any, get_service};
+use axum::routing::{any};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use dashmap::DashMap;
 use handlers::homepage;
@@ -65,7 +65,8 @@ async fn main() -> TapferResult<()> {
 
     init_datadir();
 
-    let static_dir_service = get_service(ServeDir::new("static"));
+    let static_dir_service = ServeDir::new("static");
+    let wasm_service = ServeDir::new("tapfer_crypt/pkg");
 
     let cors = CorsLayer::new()
         .allow_methods(Any)
@@ -109,6 +110,7 @@ async fn main() -> TapferResult<()> {
         .layer(RequestBodyLimitLayer::new(MAX_UPLOAD_SIZE))
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .nest_service("/static", static_dir_service)
+        .nest_service("/wasm", wasm_service)
         .merge(Scalar::with_url("/docs", <ApiDoc as OpenApi>::openapi()))
         .fallback_service(fallback_service)
         .layer(cors);

@@ -316,5 +316,13 @@
 		}
     });
 </script>
+<script type="module">
+    import init, { add } from '/wasm/tapfer_crypt.js';
+    async function run() {
+        await init();
+    }
+
+    run();
+</script>
 </body>
 </html>

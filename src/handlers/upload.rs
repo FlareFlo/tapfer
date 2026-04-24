@@ -9,12 +9,13 @@ use crate::updown::upload_pool::UploadFsm;
 use crate::websocket::WsEvent;
 use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL, websocket};
 use axum::extract::multipart::Field;
-use axum::extract::{Multipart, Path, Query};
+use axum::extract::{FromRequest, Multipart, Path, Query, Request};
 use axum::http::StatusCode;
 use axum::response::Html;
 use axum::response::IntoResponse;
 use axum_extra::extract::Host;
 use futures_util::TryStreamExt;
+use futures_util::StreamExt;
 use scopeguard::defer;
 use std::io::Error;
 use std::pin::{Pin, pin};
@@ -34,6 +35,7 @@ pub struct UploadParameters {
     expiration: Option<String>,
     timezone: Option<String>,
     deposit: Option<u64>,
+    filename: Option<String>,
 }
 
 #[utoipa::path(
@@ -55,13 +57,13 @@ pub struct UploadParameters {
 pub async fn accept_form(
     Host(mut host): Host,
     Query(params): Query<UploadParameters>,
-    multipart: Multipart,
+    req: Request,
 ) -> TapferResult<impl IntoResponse> {
     let id = TapferId::new_random();
     fs::create_dir(&format!("data/{id}")).await?;
 
     info!("Beginning upload of {id}");
-    let res = do_upload(multipart, id, &params).await;
+    let res = do_upload(req, id, &params).await;
     if res.is_err() {
         delete_asset(id).await?;
     }
@@ -80,7 +82,7 @@ pub async fn accept_form(
 }
 
 async fn do_upload(
-    mut multipart: Multipart,
+    req: Request,
     id: TapferId,
     params: &UploadParameters,
 ) -> TapferResult<()> {
@@ -123,19 +125,54 @@ async fn do_upload(
         websocket::broadcast_event(deposit, WsEvent::DepositReady { id })?;
     }
 
-    while let Some(field) = multipart.next_field().await? {
-        let name = field
-            .name()
-            .ok_or(TapferError::MultipartFieldNameMissing)?
-            .to_string();
-        if name.as_str() == "file" {
-            payload_field(field, id, meta.clone(), size).await?;
-        } else {
-            error!("Got unexpected form field {name}");
-            Err(TapferError::UnknownMultipartField {
-                field_name: name.clone(),
-            })?;
+    let is_multipart = req
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.starts_with("multipart/form-data"))
+        .unwrap_or(false);
+
+    if is_multipart {
+        let mut multipart = Multipart::from_request(req, &())
+            .await
+            .map_err(|_| TapferError::MultipartFieldNameMissing)?;
+
+        while let Some(field) = multipart.next_field().await? {
+            let name = field.name().ok_or(TapferError::MultipartFieldNameMissing)?.to_string();
+            if name.as_str() == "file" {
+                payload_field(field, id, meta.clone(), size).await?;
+            } else {
+                error!("Got unexpected form field {name}");
+                Err(TapferError::UnknownMultipartField { field_name: name.clone() })?;
+            }
         }
+    } else {
+        let file_name = params.filename.clone().unwrap_or_else(|| id.to_string());
+        let content_type = req
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or(mime::APPLICATION_OCTET_STREAM.as_ref())
+            .to_string();
+
+        let metadata = meta.build(file_name.clone(), content_type.clone(), size);
+        let handle = UPLOAD_POOL.handle(id, metadata.clone());
+        let f = File::create(format!("data/{id}/{file_name}")).await?;
+        let mut f = UpdownWriter::new(f, handle.clone(), metadata, size.is_none());
+
+        let mut s = BufReader::with_capacity(
+            UPLOAD_BUFSIZE,
+            StreamReader::new(req.into_body().into_data_stream().map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+            })),
+        );
+        copy_buf(&mut s, &mut f).await?;
+
+        let metadata = f.metadata();
+        fs::write(format!("data/{id}/meta.toml"), toml::to_string_pretty(&metadata)?.as_bytes()).await?;
+
+        handle.write_fsm().await.mark_complete();
+        websocket::broadcast_event(id, WsEvent::UploadComplete)?;
     }
     Ok(())
 }

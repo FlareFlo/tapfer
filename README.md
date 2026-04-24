@@ -7,3 +7,9 @@
 3. Configure your reverse proxy if applicable according to `rever_proxy`. Default configs are provided, replace {{TLD}} with your real TLD
 4. (optional) Configure a ZFS storage quota (or similar) on the `data` folder or keep the data a volume without a local mountpoint
 5. `docker-compose up -d --build` To build and deploy the container
+
+# Local dev
+run caddy for local HTTP/2 support
+```sh
+caddy reverse-proxy --from localhost:4000 --to localhost:3000
+```

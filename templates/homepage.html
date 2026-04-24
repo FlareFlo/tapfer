@@ -116,7 +116,10 @@
 	</div>
 </section>
 {% include "components/footer.html" %}
-<script>
+<script type="module">
+	import init, { FileEncrypter } from '/wasm/tapfer_crypt.js';
+	await init();
+
 	// All id elements
     const copylink_button = document.getElementById("copy_link_button");
     const download_url = document.getElementById("download_url");
@@ -125,6 +128,12 @@
     const percentageElement = document.getElementById('blurred-percentage');
     const form = document.getElementById('uploadForm');
     const fileinput = document.getElementById("file_input");
+
+    // Base64URL encoding helper
+    function encodeBase64Url(uint8Array) {
+        const base64 = btoa(String.fromCharCode.apply(null, uint8Array));
+        return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
 
     // Hide/show elements when deposit mode is enabled
     const current_params = new URLSearchParams(window.location.search);
@@ -185,7 +194,7 @@
 		}
 	})
 
-    form.addEventListener('submit', function (e) {
+    form.addEventListener('submit', async function (e) {
         // We handle the entire request ourselves
         e.preventDefault();
 
@@ -194,11 +203,23 @@
         window.crypto.getRandomValues(array);
         const random_seed =  array[0];
 
-        const form = e.target;
-        const formData = new FormData(form);
+        const fileInput = form.querySelector('input[name="file"]');
+        const file = fileInput.files[0];
+        if (!file) return;
 
-        // Prepare our POST
-        const main_xhr = new XMLHttpRequest();
+        const encrypter = new FileEncrypter();
+        const key = encrypter.export_key();
+        const nonce = encrypter.export_nonce();
+
+        const combinedSecret = new Uint8Array(40);
+        combinedSecret.set(key, 0);
+        combinedSecret.set(nonce, 32);
+        const secretString = encodeBase64Url(combinedSecret);
+
+        const CHUNK_SIZE = 1024 * 1024;
+        const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+        const totalEncryptedSize = file.size + (totalChunks * 16);
+        
         let cdnUrl = window.location.origin;
         if (window.location.hostname !== 'localhost') {
             cdnUrl = cdnUrl.replace(window.location.hostname, "cdn." + window.location.hostname);
@@ -206,15 +227,14 @@
             console.log("Localhost mode, not using CDN url");
 		}
 
-        // Set all form fields as headers
-        const fileInput = form.querySelector('input[name="file"]');
-        const file = fileInput.files[0];
+        const formDataParams = new FormData(form);
 
         const params = new URLSearchParams({
-            "file_size": file.size,
+            "file_size": totalEncryptedSize,
             "progress_token": random_seed.toString(),
-            "expiration": formData.get("expiration"),
-            "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone
+            "expiration": formDataParams.get("expiration"),
+            "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+            "filename": file.name
         });
 		// Forward deposit ID
 		const current_params = new URLSearchParams(window.location.search);
@@ -222,107 +242,111 @@
 			params.append("deposit", current_params.get("deposit"));
 		}
 
-        main_xhr.open('POST', `${cdnUrl}/?${params.toString()}`, true);
-
-
         background.style.backgroundSize = '0% 100%';
 
         // Tracks upload speed
         let last_progress = Date.now();
         let last_loaded = 0;
-
-        // Circular buffer for recent speed samples
         const speedSamples = [];
         const maxSamples = 300;
 
-        main_xhr.upload.addEventListener('progress', function (e) {
-            if (e.lengthComputable) {
-                const percent = (e.loaded / e.total) * 100;
-                background.style.backgroundSize = percent + '% 100%';
-                percentageElement.innerText = `${percent.toFixed(1)}%`;
-
-                const now = Date.now();
-                const elapsed = (now - last_progress) / 1000;// seconds not millis
-                const bytes_since_last = e.loaded - last_loaded;
-                const speedBps = bytes_since_last / (elapsed || 1); // bytes per second (avoid divide by zero)
-
-                speedSamples.push(speedBps);
-                if (speedSamples.length > maxSamples) {
-                    speedSamples.shift(); // remove oldest
-                }
-
-                const averageSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
-
-                progresstext.innerText = `${(e.loaded / 1024 / 1024).toFixed(1)}MB / ${(e.total / 1024 / 1024).toFixed(1)}MB ${(averageSpeed / 1024 / 1024).toFixed(1)}MB/s`;
-                last_progress = now;
-                last_loaded = e.loaded;
-            }
-        });
-
+        let currentChunk = 0;
+        let uploadedBytes = 0;
         let fired = false;
         let sent = Date.now();
 
-        main_xhr.upload.addEventListener('progress', function (e) {
-            if (fired) {return;}
-            // Do not send id request when less than a megabyte has been transferred
-			// This is both:
-			// a hack ensuring the backend registered the id token and;
-			// a measure to protect the backend from getting a request with tiny payloads that complete instantly
-			// Only fire token request when one second of upload has passed
-            if ((Date.now() - sent) < 1000) {return;};
+        const stream = new ReadableStream({
+            async pull(controller) {
+                try {
+                    if (currentChunk < totalChunks) {
+                        // Read, encrypt, and push ONLY a 1MB chunk to the network buffer
+                        const start = currentChunk * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, file.size);
+                        const chunkBlob = file.slice(start, end);
+                        const arrayBuffer = await chunkBlob.arrayBuffer();
+                        const chunk = new Uint8Array(arrayBuffer);
+                        const isLast = (currentChunk === totalChunks - 1);
 
-            const token_xhr = new XMLHttpRequest();
-            token_xhr.open('GET', `/uploads/query_id/${random_seed}`, true);
-            const qrcode = document.getElementById('qrcode');
+                        const encrypted = encrypter.encrypt_chunk(chunk, isLast);
+                        controller.enqueue(encrypted);
+                        uploadedBytes += encrypted.length;
 
-            token_xhr.onload = async function () {
-                if (token_xhr.status >= 200 && token_xhr.status < 300) {
-                    const url = `/uploads/${token_xhr.responseText}`;
-                    download_url.href = url;
-                    download_url.innerText = token_xhr.responseText;
+                        // Calculate Progress
+                        const percent = (uploadedBytes / totalEncryptedSize) * 100;
+                        background.style.backgroundSize = percent + '% 100%';
+                        percentageElement.innerText = `${percent.toFixed(1)}%`;
 
-                    qrcode.src = `/qrcg/${token_xhr.responseText}`;
-                    qrcode.style.filter = 'none';
+                        const now = Date.now();
+                        const elapsed = (now - last_progress) / 1000;
+                        const bytes_since_last = uploadedBytes - last_loaded;
+                        const speedBps = bytes_since_last / (elapsed || 0.01);
+
+                        speedSamples.push(speedBps);
+                        if (speedSamples.length > maxSamples) speedSamples.shift();
+                        const averageSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
+
+                        progresstext.innerText = `${(uploadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalEncryptedSize / 1024 / 1024).toFixed(1)}MB ${(averageSpeed / 1024 / 1024).toFixed(1)}MB/s`;
+                        last_progress = now;
+                        last_loaded = uploadedBytes;
+
+                        // Fire Token Request
+                        if (!fired && (Date.now() - sent) > 1000) {
+                            fired = true;
+                            const token_xhr = new XMLHttpRequest();
+                            token_xhr.open('GET', `/uploads/query_id/${random_seed}`, true);
+                            token_xhr.onload = async function () {
+                                if (token_xhr.status >= 200 && token_xhr.status < 300) {
+                                    const url = `/uploads/${token_xhr.responseText}#${secretString}`;
+                                    download_url.href = url;
+                                    download_url.innerText = "Encrypted Link Ready";
+                                    const qrcode = document.getElementById('qrcode');
+                                    // Encode URL so the # isn't truncated by the browser's router
+                                    qrcode.src = `/qrcg/${encodeURIComponent(url)}`;
+                                    qrcode.style.filter = 'none';
+                                }
+                            };
+                            token_xhr.send();
+                        }
+                        currentChunk++;
+                    } else {
+                        controller.close();
+                        encrypter.free();
+                    }
+                } catch (err) {
+                    controller.error(err);
+                    encrypter.free();
+                    show_toast("Encryption failed: " + err.toString(), "error");
                 }
-            };
-
-
-            token_xhr.send();
-            fired = true;
-        });
-
-        main_xhr.addEventListener('error', function (e) {
-            show_toast("XHR failed", "error");
-		})
-
-        main_xhr.onload = function () {
-            // Follow redirect to upload location
-            if (main_xhr.status >= 200 && main_xhr.status < 300) {
-                console.log(`redirecting to ${main_xhr.responseText}`);
-                window.location.href = main_xhr.responseText;
-            } else {
-                show_toast('Upload failed', "error");
-                background.style.backgroundSize = '0% 100%';
             }
-        };
-
-        // Unset all form fields, as only file will be needed. The rest is in the headers
-        formData.delete("expiration");
-        main_xhr.send(formData);
+        });
 
         const show_elems = document.getElementsByClassName("show_on_upload");
         for (const elem of show_elems) {
             elem.style.visibility = "unset";
 		}
-    });
-</script>
-<script type="module">
-    import init, { add } from '/wasm/tapfer_crypt.js';
-    async function run() {
-        await init();
-    }
 
-    run();
+        try {
+            const response = await fetch(`${cdnUrl}/?${params.toString()}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/octet-stream'
+                },
+                body: stream,
+                duplex: 'half'
+            });
+
+            if (response.ok) {
+                const responseText = await response.text();
+                console.log(`redirecting to ${responseText}`);
+                window.location.href = responseText + "#" + secretString;
+            } else {
+                throw new Error(`Server returned ${response.status}`);
+            }
+        } catch (err) {
+            show_toast('Upload failed: ' + err.message, "error");
+            background.style.backgroundSize = '0% 100%';
+        }
+    });
 </script>
 </body>
 </html>

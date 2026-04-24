@@ -70,7 +70,7 @@ pub async fn download_html(
         download_url: if !localhost {
             &format!("https://cdn.{host}/uploads/{id}/download")
         } else {
-            &format!("http://localhost:3000/uploads/{id}/download")
+            &format!("https://localhost:4000/uploads/{id}/download")
         },
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {

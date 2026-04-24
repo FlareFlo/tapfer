@@ -35,7 +35,7 @@
 			<p id="sha512_box"><strong>Sha512:</strong> <a id="sha512_value" href="{{sha512url}}" target="_blank" rel="noreferrer">{{sha512}}</a></p>
 		</div>
 		<div style="display: flex; gap: 10px;">
-			<a href="{{download_url}}" download class="button">Download</a>
+			<button id="download_button" class="button">Download</button>
 			<form>
 				<button id="copy_link" type="button">Copy direct download link</button>
 			</form>
@@ -49,13 +49,118 @@
 	</div>
 </div>
 
+<script type="module">
+    import init, { FileDecrypter } from '/wasm/tapfer_crypt.js';
+
+    const downloadButton = document.getElementById("download_button");
+
+    downloadButton.addEventListener('click', async () => {
+        const hash = window.location.hash.substring(1);
+
+        // not encrypted
+        if (!hash) {
+            const a = document.createElement('a');
+            a.href = "{{download_url}}";
+            a.download = "{{filename}}";
+            a.click();
+            return;
+        }
+
+        // prevent reload before download is complete
+        window.is_downloading = true;
+
+        downloadButton.innerText = "Decrypting...";
+        downloadButton.disabled = true;
+
+        try {
+            await init();
+
+            let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) { base64 += '='; }
+            const binaryString = atob(base64);
+            const combined = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                combined[i] = binaryString.charCodeAt(i);
+            }
+            const key = combined.slice(0, 32);
+            const nonce = combined.slice(32, 40);
+            const decrypter = new FileDecrypter(key, nonce);
+
+            const response = await fetch("{{download_url}}");
+            if (!response.ok) throw new Error(`Failed to fetch file: ${response.statusText}`);
+
+            const encryptedStream = response.body;
+
+            // This TransformStream re-assembles the arbitrary chunks from the network
+            // into the exact chunk sizes the decrypter expects.
+            const decryptionTransformer = new TransformStream({
+                start() {
+                    // Each original 1MB chunk has a 16-byte tag appended by the encryptor.
+                    this.CHUNK_SIZE = 1024 * 1024;
+                    this.ENCRYPTED_CHUNK_SIZE = this.CHUNK_SIZE + 16;
+                    this.buffer = new Uint8Array(0);
+                },
+                transform(chunk, controller) {
+                    // Add new data to the buffer
+                    const newBuffer = new Uint8Array(this.buffer.length + chunk.length);
+                    newBuffer.set(this.buffer);
+                    newBuffer.set(chunk, this.buffer.length);
+                    this.buffer = newBuffer;
+
+                    // Process as many full chunks as we can
+                    while (this.buffer.length >= this.ENCRYPTED_CHUNK_SIZE) {
+                        const chunkToDecrypt = this.buffer.slice(0, this.ENCRYPTED_CHUNK_SIZE);
+                        this.buffer = this.buffer.slice(this.ENCRYPTED_CHUNK_SIZE);
+                        const decrypted = decrypter.decrypt_chunk(chunkToDecrypt, false);
+                        controller.enqueue(decrypted);
+                    }
+                },
+                flush(controller) {
+                    // If theres any data left in the buffer, it must be the last chunk
+                    if (this.buffer.length > 0) {
+                        const decrypted = decrypter.decrypt_chunk(this.buffer, true);
+                        controller.enqueue(decrypted);
+                    }
+                    decrypter.free();
+                }
+            });
+
+            const decryptedStream = encryptedStream.pipeThrough(decryptionTransformer);
+
+            // Convert the decrypted stream to a Blob to make it downloadable.
+            // NOTE: This will buffer the entire DECRYPTED file in memory.
+            // For true large file streaming-to-disk, the File System Access API
+            // or a library like stream-saver.js would be required.
+            const decryptedBlob = await new Response(decryptedStream).blob();
+
+            const url = URL.createObjectURL(decryptedBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "{{filename}}";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            downloadButton.innerText = "Downloaded!";
+
+        } catch (err) {
+            console.error("Decryption/Download failed:", err);
+            alert("Decryption failed! The key might be wrong or the file is corrupted.");
+            downloadButton.innerText = "Download Failed";
+        } finally {
+            downloadButton.disabled = false;
+        }
+    });
+</script>
+
 <script>
     {% include "components/ws_shutdown_listener.js" %}
 
 	const copy_link = document.getElementById('copy_link');
 	copy_link.addEventListener('click', async () => {
 		try {
-			await navigator.clipboard.writeText("{{download_url}}");
+			await navigator.clipboard.writeText(window.location.href);
 			copy_link.innerText = "Copied!";
             setTimeout(() => {
                 copy_link.innerText = "Copy direct download link";
@@ -113,7 +218,9 @@
 		const payload = JSON.parse(e.data);
 		switch (payload.event.key) {
 			case "DeleteAsset":
-				window.location.reload();
+				if (!window.is_downloading) {
+					window.location.reload();
+				}
 				break;
 			case "UploadProgress":
 				const total = payload.event.total;

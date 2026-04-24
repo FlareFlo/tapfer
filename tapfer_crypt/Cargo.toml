@@ -1,0 +1,15 @@
+[package]
+name = "tapfer-crypt"
+publish = false
+edition = "2024"
+version = "0.0.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "*"
+
+[dependencies.web-sys]
+features = ['Document', 'Element', 'HtmlElement', 'Node', 'Window']
+version = "*"

@@ -1,6 +1,5 @@
 use crate::configuration::{EMBED_DESCRIPTION, FAVICON, QR_CODE_ECC, QR_CODE_SIZE};
 use crate::structs::error::TapferResult;
-use crate::websocket::wss_method;
 use askama::Template;
 use axum::extract::{Query, WebSocketUpgrade};
 use axum::response::{Html, IntoResponse, Response};
@@ -34,8 +33,7 @@ pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
         qr_size: QR_CODE_SIZE,
         qr_b64: BASE64_STANDARD.encode(&qr_code),
         ws_url: format!(
-            "{}://{host}/deposit/ws?deposit={deposit_id}",
-            wss_method(&host)
+            "wss://{host}/deposit/ws?deposit={deposit_id}",
         ),
     };
 

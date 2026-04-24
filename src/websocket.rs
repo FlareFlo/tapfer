@@ -1,4 +1,3 @@
-use crate::handlers::is_localhost;
 use crate::structs::error::TapferResult;
 use crate::structs::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
@@ -58,11 +57,6 @@ pub fn broadcast_event(dst: impl Into<WsDestination> + Copy, event: WsEvent) -> 
     rx.send(event).unwrap();
     Ok(())
 }
-
-pub fn wss_method(host: &str) -> &str {
-    if is_localhost(host) { "ws" } else { "wss" }
-}
-
 // Impl
 
 #[axum::debug_handler]

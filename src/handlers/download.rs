@@ -1,7 +1,6 @@
 use crate::configuration::{DOWNLOAD_CHUNKSIZE, EMBED_DESCRIPTION, QR_CODE_SIZE};
 use crate::handlers;
 use crate::handlers::checksum::get_sha512_for_asset;
-use crate::handlers::is_localhost;
 use crate::handlers::qrcode::base64_qr_from_id;
 use crate::retention_control::delete_asset;
 use crate::structs::error::{TapferError, TapferResult};
@@ -9,7 +8,6 @@ use crate::structs::file_meta::{FileMeta, RemovalPolicy};
 use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
-use crate::websocket::wss_method;
 use askama::Template;
 use axum::body::Body;
 use axum::extract::Path;
@@ -62,16 +60,11 @@ pub async fn download_html(
         RemovalPolicy::Expiry { .. } => meta.expires_on_utc().unwrap().format(&DES)?.clone(),
     };
 
-    let localhost = is_localhost(&host);
     let sha512 = get_sha512_for_asset(id)?;
     let template = DownloadTemplate {
         filename: meta.name(),
         expiry: &expiry,
-        download_url: if !localhost {
-            &format!("https://cdn.{host}/uploads/{id}/download")
-        } else {
-            &format!("https://localhost:4000/uploads/{id}/download")
-        },
+        download_url: &format!("https://cdn.{host}/uploads/{id}/download"),
         mimetype: meta.content_type(),
         filesize: if meta.known_size().is_some() {
             &human_bytes(meta.size() as f64)
@@ -88,7 +81,7 @@ pub async fn download_html(
         unix_expiry: meta
             .expires_on_utc()
             .map_or(0, time::UtcDateTime::unix_timestamp),
-        ws_url: &format!("{}://{host}/uploads/{id}/ws", wss_method(&host)),
+        ws_url: &format!("wss://{host}/uploads/{id}/ws"),
         sha512: sha512.as_deref().unwrap_or("computing..."),
         sha512url: format!("/uploads/{id}/checksum.sha512"),
     };

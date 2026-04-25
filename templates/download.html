@@ -51,6 +51,7 @@
 
 <script type="module">
     import init, { FileDecrypter } from '/wasm/tapfer_crypt.js';
+    import streamSaver from 'https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/+esm';
 
     const downloadButton = document.getElementById("download_button");
 
@@ -100,29 +101,45 @@
                     // Each original 1MB chunk has a 16-byte tag appended by the encryptor.
                     this.CHUNK_SIZE = 1024 * 1024 * 10;
                     this.ENCRYPTED_CHUNK_SIZE = this.CHUNK_SIZE + 16;
-                    this.buffer = new Uint8Array(0);
+                    
+                    // Pre-allocate a single fixed-size bucket
+                    this.buffer = new Uint8Array(this.ENCRYPTED_CHUNK_SIZE);
+                    this.offset = 0;
+                    this.lastUiUpdate = 0;
                 },
                 transform(chunk, controller) {
-                    // Add new data to the buffer
-                    const newBuffer = new Uint8Array(this.buffer.length + chunk.length);
-                    newBuffer.set(this.buffer);
-                    newBuffer.set(chunk, this.buffer.length);
-                    this.buffer = newBuffer;
-
-                    // Process as many full chunks as we can
-                    while (this.buffer.length >= this.ENCRYPTED_CHUNK_SIZE) {
-                        const chunkToDecrypt = this.buffer.slice(0, this.ENCRYPTED_CHUNK_SIZE);
-                        this.buffer = this.buffer.slice(this.ENCRYPTED_CHUNK_SIZE);
-                        const decrypted = decrypter.decrypt_chunk(chunkToDecrypt, false);
-                        controller.enqueue(decrypted);
-                        downloadButton.innerText = `Decrypting ${progress / file_size * 100}%`;
-                        progress += this.ENCRYPTED_CHUNK_SIZE;
+                    let chunkOffset = 0;
+                    
+                    while (chunkOffset < chunk.length) {
+                        const spaceLeft = this.ENCRYPTED_CHUNK_SIZE - this.offset;
+                        const bytesToCopy = Math.min(spaceLeft, chunk.length - chunkOffset);
+                        
+                        // Drop the network bytes directly into our pre-allocated bucket
+                        this.buffer.set(chunk.subarray(chunkOffset, chunkOffset + bytesToCopy), this.offset);
+                        this.offset += bytesToCopy;
+                        chunkOffset += bytesToCopy;
+                        
+                        // If the bucket is full, decrypt it and reset the cursor
+                        if (this.offset === this.ENCRYPTED_CHUNK_SIZE) {
+                            const decrypted = decrypter.decrypt_chunk(this.buffer, false);
+                            controller.enqueue(decrypted);
+                            progress += this.ENCRYPTED_CHUNK_SIZE;
+                            
+                            const now = Date.now();
+                            if (now - this.lastUiUpdate > 100) {
+                                downloadButton.innerText = `Decrypting ${(progress / file_size * 100).toFixed(1)}%`;
+                                this.lastUiUpdate = now;
+                            }
+                            
+                            this.offset = 0; // Reset cursor! Zero new allocations!
+                        }
                     }
                 },
                 flush(controller) {
-                    // If theres any data left in the buffer, it must be the last chunk
-                    if (this.buffer.length > 0) {
-                        const decrypted = decrypter.decrypt_chunk(this.buffer, true);
+                    // If there is a partial chunk left over at the end of the file
+                    if (this.offset > 0) {
+                        const remaining = this.buffer.subarray(0, this.offset);
+                        const decrypted = decrypter.decrypt_chunk(remaining, true);
                         controller.enqueue(decrypted);
                     }
                     decrypter.free();
@@ -131,20 +148,13 @@
 
             const decryptedStream = encryptedStream.pipeThrough(decryptionTransformer);
 
-            // Convert the decrypted stream to a Blob to make it downloadable.
-            // NOTE: This will buffer the entire DECRYPTED file in memory.
-            // For true large file streaming-to-disk, the File System Access API
-            // or a library like stream-saver.js would be required.
-            const decryptedBlob = await new Response(decryptedStream).blob();
-
-            const url = URL.createObjectURL(decryptedBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "{{filename}}";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // StreamSaver uses a publicly hosted Service Worker to securely pipe
+            // the stream directly to the OS download manager in all browsers (including Firefox)
+            const fileStream = streamSaver.createWriteStream("{{filename}}", {
+                size: file_size // Provides ETA and progress to the browser's download UI
+            });
+            
+            await decryptedStream.pipeTo(fileStream);
 
             downloadButton.innerText = "Downloaded!";
 

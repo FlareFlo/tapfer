@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use crate::structs::error::TapferResult;
 use crate::structs::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
@@ -8,7 +9,7 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast::WeakSender;
 use tokio::sync::broadcast::channel;
-use tracing::warn;
+use tracing::{error, warn};
 use uuid::Uuid;
 
 static WS_MAP: LazyLock<DashMap<WsDestination, WeakSender<WsEvent>>> = LazyLock::new(DashMap::new);
@@ -65,7 +66,7 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, id))
 }
 
-pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestination> + Copy) {
+pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestination> + Copy + Display) {
     let mut tx_seq = 0;
     let (_tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).and_then(|rx| rx.upgrade()) {
         (tx.clone(), tx.subscribe())
@@ -89,10 +90,12 @@ pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestin
         };
         tx_seq += 1;
 
-        socket
+        let e = socket
             .send(Message::text(serde_json::to_string(&msg).unwrap()))
-            .await
-            .unwrap();
+            .await;
+        if let Err(error) = e {
+            error!("WS for {dst} failed because {error}");
+        }
     }
     // Channel closed
 }

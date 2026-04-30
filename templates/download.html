@@ -50,14 +50,19 @@
 </div>
 
 <script type="module">
-    import init, { FileDecrypter } from '/wasm/tapfer_crypt.js';
+    import init, { FileDecrypter, qr_base64_from_url } from '/wasm/tapfer_crypt.js';
     import streamSaver from 'https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/+esm';
 
     const downloadButton = document.getElementById("download_button");
 
-    downloadButton.addEventListener('click', async () => {
-        const hash = window.location.hash.substring(1);
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+        await init();
+        const qrcode = document.getElementById("qrcode");
+        qrcode.src = qr_base64_from_url(window.location.origin, `{{download_url}}#${hash}`);
+	}
 
+    downloadButton.addEventListener('click', async () => {
         // not encrypted
         if (!hash) {
             const a = document.createElement('a');

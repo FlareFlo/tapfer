@@ -1,3 +1,5 @@
+mod qrcode;
+
 use chacha20poly1305::{
     aead::{
         stream::{DecryptorLE31, EncryptorLE31},

@@ -117,7 +117,7 @@
 </section>
 {% include "components/footer.html" %}
 <script type="module">
-	import init, { FileEncrypter } from '/wasm/tapfer_crypt.js';
+	import init, { FileEncrypter, qr_base64_from_url } from '/wasm/tapfer_crypt.js';
 	await init();
 
 	// All id elements
@@ -260,7 +260,7 @@
             download_url.href = fileUrl;
             download_url.innerText = "Encrypted Link Ready";
             const qrcode = document.getElementById('qrcode');
-            qrcode.src = `/qrcg/${encodeURIComponent(fileUrl)}`;
+            qrcode.src = qr_base64_from_url(window.location.origin, fileUrl);
             qrcode.style.filter = 'none';
 
             for (let currentChunk = 0; currentChunk < totalChunks; currentChunk++) {

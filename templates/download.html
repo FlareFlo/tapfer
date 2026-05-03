@@ -6,20 +6,22 @@
 	{% include "components/favicon.html" %}
 	{% include "components/meta.html" %}
 	<style>
-		#delete_button {
-			background: crimson;
-		}
-		#copy_link {
-			background: green;
-			width: 215px;
-		}
-		#sha512_box {
+        #delete_button {
+            background: crimson;
+        }
+
+        #copy_link {
+            background: green;
+            width: 215px;
+        }
+
+        #sha512_box {
             display: block;
             width: 300px;
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
-		}
+        }
 	</style>
 </head>
 <body>
@@ -32,7 +34,8 @@
 			<p><strong>MIME Type:</strong> {{mimetype}}</p>
 			<p id="expiry"><strong>Expires:</strong> {{expiry}}</p>
 			<p><strong>Size:</strong> {{filesize}}<span id="upload_percentage"></span></p>
-			<p id="sha512_box"><strong>Sha512:</strong> <a id="sha512_value" href="{{sha512url}}" target="_blank" rel="noreferrer">{{sha512}}</a></p>
+			<p id="sha512_box"><strong>Sha512:</strong> <a id="sha512_value" href="{{sha512url}}" target="_blank"
+			                                               rel="noreferrer">{{sha512}}</a></p>
 		</div>
 		<div style="display: flex; gap: 10px;">
 			<button id="download_button" class="button">Download</button>
@@ -43,14 +46,15 @@
 		</div>
 		<div class="hide-on-mobile">
 			<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;"></code>
-			<script>const fmt = `curl -JLO# {{download_url}}`; document.getElementById("curl_command").innerText = fmt</script>
+			<script>const fmt = `curl -JLO# {{download_url}}`;
+            document.getElementById("curl_command").innerText = fmt</script>
 		</div>
 		<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px" height="{{qr_size}}px" alt="">
 	</div>
 </div>
 
 <script type="module">
-    import init, { FileDecrypter, qr_base64_from_url } from '/wasm/tapfer_crypt.js';
+    import init, {FileDecrypter, qr_base64_from_url} from '/wasm/tapfer_crypt.js';
     import streamSaver from 'https://cdn.jsdelivr.net/npm/streamsaver@2.0.6/+esm';
 
     const downloadButton = document.getElementById("download_button");
@@ -60,7 +64,7 @@
         await init();
         const qrcode = document.getElementById("qrcode");
         qrcode.src = qr_base64_from_url(window.location.origin, `{{download_url}}#${hash}`);
-	}
+    }
 
     downloadButton.addEventListener('click', async () => {
         // not encrypted
@@ -82,9 +86,16 @@
             await init();
 
             let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-            const file_size = {{file_size_bits}};
+            const file_size = {
+            {
+                file_size_bits
+            }
+        }
+            ;
             let progress = 0;
-            while (base64.length % 4) { base64 += '='; }
+            while (base64.length % 4) {
+                base64 += '=';
+            }
             const binaryString = atob(base64);
             const combined = new Uint8Array(binaryString.length);
             for (let i = 0; i < binaryString.length; i++) {
@@ -106,37 +117,34 @@
                     // Each original 1MB chunk has a 16-byte tag appended by the encryptor.
                     this.CHUNK_SIZE = 1024 * 1024 * 10;
                     this.ENCRYPTED_CHUNK_SIZE = this.CHUNK_SIZE + 16;
-                    
-                    // Pre-allocate a single fixed-size bucket
+
                     this.buffer = new Uint8Array(this.ENCRYPTED_CHUNK_SIZE);
                     this.offset = 0;
                     this.lastUiUpdate = 0;
                 },
                 transform(chunk, controller) {
                     let chunkOffset = 0;
-                    
+
                     while (chunkOffset < chunk.length) {
                         const spaceLeft = this.ENCRYPTED_CHUNK_SIZE - this.offset;
                         const bytesToCopy = Math.min(spaceLeft, chunk.length - chunkOffset);
-                        
-                        // Drop the network bytes directly into our pre-allocated bucket
+
                         this.buffer.set(chunk.subarray(chunkOffset, chunkOffset + bytesToCopy), this.offset);
                         this.offset += bytesToCopy;
                         chunkOffset += bytesToCopy;
-                        
-                        // If the bucket is full, decrypt it and reset the cursor
+
                         if (this.offset === this.ENCRYPTED_CHUNK_SIZE) {
                             const decrypted = decrypter.decrypt_chunk(this.buffer, false);
                             controller.enqueue(decrypted);
                             progress += this.ENCRYPTED_CHUNK_SIZE;
-                            
+
                             const now = Date.now();
                             if (now - this.lastUiUpdate > 100) {
                                 downloadButton.innerText = `Decrypting ${(progress / file_size * 100).toFixed(1)}%`;
                                 this.lastUiUpdate = now;
                             }
-                            
-                            this.offset = 0; // Reset cursor! Zero new allocations!
+
+                            this.offset = 0;
                         }
                     }
                 },
@@ -158,14 +166,14 @@
             const fileStream = streamSaver.createWriteStream("{{filename}}", {
                 size: file_size // Provides ETA and progress to the browser's download UI
             });
-            
+
             await decryptedStream.pipeTo(fileStream);
 
             downloadButton.innerText = "Downloaded!";
 
         } catch (err) {
             console.error("Decryption/Download failed:", err);
-            alert("Decryption failed! The key might be wrong or the file is corrupted.");
+            show_toast("Decryption failed! The key might be wrong or the file is corrupted.", "error");
             downloadButton.innerText = "Download Failed";
         } finally {
             downloadButton.disabled = false;
@@ -174,20 +182,23 @@
 </script>
 
 <script>
-    {% include "components/ws_shutdown_listener.js" %}
+    {%
+        include
+        "components/ws_shutdown_listener.js" %
+    }
 
-	const copy_link = document.getElementById('copy_link');
-	copy_link.addEventListener('click', async () => {
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			copy_link.innerText = "Copied!";
+    const copy_link = document.getElementById('copy_link');
+    copy_link.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            copy_link.innerText = "Copied!";
             setTimeout(() => {
                 copy_link.innerText = "Copy direct download link";
-			}, 3000);
-		} catch (err) {
-			console.error('Failed to copy: ', err);
-		}
-	});
+            }, 3000);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+        }
+    });
 
     const delete_button = document.getElementById("delete_button");
     delete_button.addEventListener('click', async () => {
@@ -195,67 +206,73 @@
             console.log(res);
             if (res.ok && res.redirected) {
                 window.location.href = res.url;
-			}
-		});
-	});
+            }
+        });
+    });
 
-	function main() {
-		// Do not parse, as the server will set the expiry string properly
-		const realtime = {{ unix_expiry}};
-		if (realtime == 0) {
-			return;
-		}
-		const date = new Date(realtime * 1000);
-		const pad = (n) => n.toString().padStart(2, '0');
+    function main() {
+        // Do not parse, as the server will set the expiry string properly
+        const realtime = {
+        {
+            unix_expiry
+        }
+    }
+        ;
+        if (realtime == 0) {
+            return;
+        }
+        const date = new Date(realtime * 1000);
+        const pad = (n) => n.toString().padStart(2, '0');
 
-		const hours = pad(date.getHours());
-		const minutes = pad(date.getMinutes());
-		const day = pad(date.getDate());
-		const month = pad(date.getMonth() + 1); // Months are zero-based
-		const year = date.getFullYear();
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+        const day = pad(date.getDate());
+        const month = pad(date.getMonth() + 1); // Months are zero-based
+        const year = date.getFullYear();
 
-		const formatted = `${hours}:${minutes} ${day}-${month}-${year}`;
+        const formatted = `${hours}:${minutes} ${day}-${month}-${year}`;
 
-		document.getElementById('expiry').innerHTML = `<strong>Expires:</strong> ${formatted}`;
-	}
-	main()
+        document.getElementById('expiry').innerHTML = `<strong>Expires:</strong> ${formatted}`;
+    }
 
-	const ws = new WebSocket("{{ws_url}}");
+    main()
 
-	ws.addEventListener("error", (e) => {
-		console.error("Failed to openWS:", e);
+    const ws = new WebSocket("{{ws_url}}");
+
+    ws.addEventListener("error", (e) => {
+        console.error("Failed to openWS:", e);
         show_toast("Failed to open WS", "error");
-	});
+    });
 
-	ws.addEventListener("open", () => {
-		console.log("WS opened!");
-	});
+    ws.addEventListener("open", () => {
+        console.log("WS opened!");
+    });
 
-	let upload_percentage = document.getElementById("upload_percentage");
+    let upload_percentage = document.getElementById("upload_percentage");
     let sha512_value = document.getElementById("sha512_value");
-	ws.addEventListener("message", (e) => {
-		const payload = JSON.parse(e.data);
-		switch (payload.event.key) {
-			case "DeleteAsset":
-				if (!window.is_downloading) {
+    ws.addEventListener("message", (e) => {
+        const payload = JSON.parse(e.data);
+        switch (payload.event.key) {
+            case "DeleteAsset":
+                if (!window.is_downloading) {
                     // TODO: Delay until ready, then perform action instead of not doing it at all
-					window.location.reload();
-				}
-				break;
-			case "UploadProgress":
-				const total = payload.event.total;
-				const progress = payload.event.progress;
-				let percentage = (progress / total) * 100;
-				upload_percentage.innerText = ` Uploading(${percentage.toFixed(1)}%)`;
-				break;
-			case "UploadComplete":
-				upload_percentage.innerText = "";
-				break;
-			case "Sha512Ready":
+                    window.location.reload();
+                }
+                break;
+            case "UploadProgress":
+                const total = payload.event.total;
+                const progress = payload.event.progress;
+                let percentage = (progress / total) * 100;
+                upload_percentage.innerText = ` Uploading(${percentage.toFixed(1)}%)`;
+                break;
+            case "UploadComplete":
+                upload_percentage.innerText = "";
+                break;
+            case "Sha512Ready":
                 sha512_value.innerText = payload.event.chksum;
                 break;
-		}
-	});
+        }
+    });
     ws_shutdown_listener(ws);
 </script>
 </body>

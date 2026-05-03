@@ -30,30 +30,31 @@
 	<div class="form-box" id="uploadBox">
 		<div class="container">
 			<p>Upload to this device from the scanning device</p>
-			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="">
+			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px" , height="{{qr_size}}px"
+			     alt="">
 		</div>
 	</div>
 </section>
 <script>
-	const ws = new WebSocket("{{ws_url}}");
+    const ws = new WebSocket("{{ws_url}}");
 
-	ws.addEventListener("error", (e) => {
-		console.error("Failed to openWS:", e);
+    ws.addEventListener("error", (e) => {
+        console.error("Failed to openWS:", e);
         show_toast("Failed to open WS", "error");
-	});
+    });
 
-	ws.addEventListener("open", () => {
-		console.log("WS opened!");
-	});
+    ws.addEventListener("open", () => {
+        console.log("WS opened!");
+    });
 
-	ws.addEventListener("message", (e) => {
-		const payload = JSON.parse(e.data);
-		switch (payload.event.key) {
-			case "DepositReady":
-				window.location.href = "/uploads/" + payload.event.id;
-				break;
-		}
-	});
+    ws.addEventListener("message", (e) => {
+        const payload = JSON.parse(e.data);
+        switch (payload.event.key) {
+            case "DepositReady":
+                window.location.href = "/uploads/" + payload.event.id;
+                break;
+        }
+    });
 </script>
 </body>
 </html>

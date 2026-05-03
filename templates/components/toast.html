@@ -26,43 +26,68 @@
 
     /* Animations to fade the toast in and out */
     @-webkit-keyframes fadein {
-        from {top: 0; opacity: 0;}
-        to {top: 30px; opacity: 1;}
+        from {
+            top: 0;
+            opacity: 0;
+        }
+        to {
+            top: 30px;
+            opacity: 1;
+        }
     }
 
     @keyframes fadein {
-        from {top: 0; opacity: 0;}
-        to {top: 30px; opacity: 1;}
+        from {
+            top: 0;
+            opacity: 0;
+        }
+        to {
+            top: 30px;
+            opacity: 1;
+        }
     }
 
     @-webkit-keyframes fadeout {
-        from {top: 30px; opacity: 1;}
-        to {top: 0; opacity: 0;}
+        from {
+            top: 30px;
+            opacity: 1;
+        }
+        to {
+            top: 0;
+            opacity: 0;
+        }
     }
 
     @keyframes fadeout {
-        from {bottom: 30px; opacity: 1;}
-        to {bottom: 0; opacity: 0;}
+        from {
+            bottom: 30px;
+            opacity: 1;
+        }
+        to {
+            bottom: 0;
+            opacity: 0;
+        }
     }
 </style>
 <script>
 
-	let toasts = [];
+    let toasts = [];
     let showing_toast = false;
 
-	function show_toast(text, level) {
-        toasts.push({ text, level });
+    function show_toast(text, level) {
+        toasts.push({text, level});
         while (!showing_toast) {
             _show_toast();
-		}
-	}
+        }
+    }
+
     function _show_toast() {
         if (toasts.length === 0) {
-         	showing_toast = false;
+            showing_toast = false;
             return
-		}
+        }
 
-        const { text, level } = toasts.shift();
+        const {text, level} = toasts.shift();
         showing_toast = true;
 
         // Get the toast DIV
@@ -70,34 +95,34 @@
         const toast = document.createElement("div");
         toast_container.appendChild(toast);
 
-        switch(level) {
+        switch (level) {
             case "error":
                 toast.style.backgroundColor = "#cc3300";
                 break;
-			case "warn":
+            case "warn":
                 toast.style.backgroundColor = "#fffb04";
                 toast.style.color = "#000000";
                 break;
-			case "info":
+            case "info":
                 toast.style.backgroundColor = "#40a6ce";
                 break;
-			case "success":
+            case "success":
                 toast.style.backgroundColor = "#339900";
                 break;
-		}
+        }
 
         // Add the "show" class to DIV
         toast.className = "toast show";
         toast.innerText = text;
 
         // After 3 seconds, remove the show class from DIV
-        setTimeout(function(){
+        setTimeout(function () {
             toast.className = toast.className.replace("show", "");
-            setTimeout(function(){
+            setTimeout(function () {
                 toast.remove();
                 _show_toast();
-				}, 500)
-		}, 2500);
+            }, 500)
+        }, 2500);
     }
 </script>
 <div id="toast"></div>

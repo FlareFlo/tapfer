@@ -38,27 +38,27 @@
             white-space: nowrap;
         }
 
-		#qrcode {
-			filter: blur(5px);
-		}
+        #qrcode {
+            filter: blur(5px);
+        }
 
-		#filelink {
-			border-bottom-style: dot-dot-dash;
-			transition: color 0.5s ease;
-		}
+        #filelink {
+            border-bottom-style: dot-dot-dash;
+            transition: color 0.5s ease;
+        }
 
-		#filelink:hover {
-			color: crimson;
-		}
+        #filelink:hover {
+            color: crimson;
+        }
 
-		.show_on_upload {
-			visibility: hidden;
-		}
+        .show_on_upload {
+            visibility: hidden;
+        }
 
-		/* Prevents purple link when clicked before */
-		a[href="/deposit"]:visited {
-			color: #0000EE;
-		}
+        /* Prevents purple link when clicked before */
+        a[href="/deposit"]:visited {
+            color: #0000EE;
+        }
 	</style>
 </head>
 <body>
@@ -69,10 +69,11 @@
 	<div class="form-box" id="uploadBox">
 		<div class="container">
 			<div>
-				Drop file anywhere, <a id="filelink" href="javascript:document.getElementById('file_input').click();">select a file</a><span class="hide_deposit_mode" > or <a href="/deposit">upload to this device</a></span>
+				Drop file anywhere, <a id="filelink" href="javascript:document.getElementById('file_input').click();">select
+				a file</a><span class="hide_deposit_mode"> or <a href="/deposit">upload to this device</a></span>
 			</div>
 
-<!--			TODO: Add toggle for E2EE here-->
+			<!--			TODO: Add toggle for E2EE here-->
 			<form id="uploadForm">
 				<div style="display: flex; align-items: center; gap: 0.5rem;">
 					<p style="margin: 0;">Delete after:</p>
@@ -96,32 +97,37 @@
 
 			<div class="hide-on-mobile">
 				Or use CURL <br>
-				<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;">curl -X POST https://example.com<span class="show_deposit_mode">?deposit={deposit_id}</span> -F file=@</code><code style="color: #00e2ff; !important; user-select: none; padding: 0.2rem 0.2rem 0.2rem 0;">$FILEPATH</code>
+				<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;">curl -X POST
+					https://example.com<span class="show_deposit_mode">?deposit={deposit_id}</span> -F
+					file=@</code><code
+					style="color: #00e2ff; !important; user-select: none; padding: 0.2rem 0.2rem 0.2rem 0;">$FILEPATH</code>
 				<script>
-					const loc = window.location;
-					const curlUrl = loc.hostname === 'localhost' ? loc.origin : loc.origin.replace(loc.hostname, 'cdn.' + loc.hostname);
-					const fmt = `curl -X POST ${curlUrl} -F file=@`;
-					document.getElementById("curl_command").innerText = fmt;
+                    const loc = window.location;
+                    const curlUrl = loc.hostname === 'localhost' ? loc.origin : loc.origin.replace(loc.hostname, 'cdn.' + loc.hostname);
+                    const fmt = `curl -X POST ${curlUrl} -F file=@`;
+                    document.getElementById("curl_command").innerText = fmt;
 				</script>
 			</div>
 
 			<div id="progress_text" class="show_on_upload">0MB/0MB 0MB/s</div>
 			<a class="button show_on_upload" href="/" style="background-color: crimson">Abort upload</a>
 			<div class="hide_deposit_mode">
-<!--				Padded to UUID string length-->
-				<a id="download_url" href="unset" target="_blank" class="show_on_upload">Download URL                        </a>
+				<!--				Padded to UUID string length-->
+				<a id="download_url" href="unset" target="_blank" class="show_on_upload">Download URL </a>
 				<button id="copy_link_button" class="show_on_upload">Copy to clipboard</button>
 			</div>
-			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px", height="{{qr_size}}px" alt="" class="hide_deposit_mode">
+			<img id="qrcode" src="data:image/png;base64, {{ qr_b64 }}" width="{{qr_size}}px" , height="{{qr_size}}px"
+			     alt="" class="hide_deposit_mode">
 		</div>
 	</div>
 </section>
 {% include "components/footer.html" %}
 <script type="module">
-	import init, { FileEncrypter, qr_base64_from_url } from '/wasm/tapfer_crypt.js';
-	await init();
+    import init, {FileEncrypter, qr_base64_from_url} from '/wasm/tapfer_crypt.js';
 
-	// All id elements
+    await init();
+
+    // All id elements
     const copylink_button = document.getElementById("copy_link_button");
     const download_url = document.getElementById("download_url");
     const progresstext = document.getElementById("progress_text");
@@ -150,23 +156,23 @@
         show_elems.forEach(element => {
             element.style.display = 'display-block';
         });
-	}
+    }
 
     copylink_button.addEventListener("click", () => {
         let copy_to_clipboard = () => {
             navigator.clipboard.writeText(download_url.href);
             show_toast("Copied to clipboard!", "success");
-		};
+        };
 
         // Delay copy action until it is ready
         if (download_url.href.endsWith("unset")) {
             setTimeout(() => {
                 copy_to_clipboard();
-			}, 1000);
-		} else {
+            }, 1000);
+        } else {
             copy_to_clipboard();
-		}
-	});
+        }
+    });
 
     // Prevent default actions
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -180,20 +186,20 @@
         dataTransfer.items.add(e.dataTransfer.files[0]);
         fileinput.files = dataTransfer.files;
         form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
-	})
+    })
 
-	// Dispatch upload once a file is selected
-	fileinput.addEventListener("change", (e) => {
+    // Dispatch upload once a file is selected
+    fileinput.addEventListener("change", (e) => {
         e.preventDefault();
         form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     })
 
-	// Prevent opening when it's not ready yet
+    // Prevent opening when it's not ready yet
     download_url.addEventListener("click", (e) => {
         if (download_url.href.endsWith("unset")) {
             e.preventDefault();
-		}
-	})
+        }
+    })
 
     form.addEventListener('submit', async function (e) {
         // We handle the entire request ourselves
@@ -215,13 +221,13 @@
         const CHUNK_SIZE = 1024 * 1024 * 10;
         const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
         const totalEncryptedSize = file.size + (totalChunks * 16);
-        
+
         let cdnUrl = window.location.origin;
         if (window.location.hostname !== 'localhost') {
             cdnUrl = cdnUrl.replace(window.location.hostname, "cdn." + window.location.hostname);
-		} else {
+        } else {
             console.log("Localhost mode, not using CDN url");
-		}
+        }
 
         const formDataParams = new FormData(form);
 
@@ -231,11 +237,11 @@
             "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
             "filename": file.name
         });
-		// Forward deposit ID
-		const current_params = new URLSearchParams(window.location.search);
-		if (current_params.has("deposit")) {
-			params.append("deposit", current_params.get("deposit"));
-		}
+        // Forward deposit ID
+        const current_params = new URLSearchParams(window.location.search);
+        if (current_params.has("deposit")) {
+            params.append("deposit", current_params.get("deposit"));
+        }
 
         background.style.backgroundSize = '0% 100%';
 
@@ -250,10 +256,10 @@
         const show_elems = document.getElementsByClassName("show_on_upload");
         for (const elem of show_elems) {
             elem.style.visibility = "unset";
-		}
+        }
 
-                try {
-            const initRes = await fetch(`${cdnUrl}/upload/init?${params.toString()}`, { method: 'POST' });
+        try {
+            const initRes = await fetch(`${cdnUrl}/upload/init?${params.toString()}`, {method: 'POST'});
             if (!initRes.ok) throw new Error("Initialization failed");
             const uploadId = await initRes.text();
 
@@ -265,45 +271,45 @@
             qrcode.style.filter = 'none';
 
             for (let currentChunk = 0; currentChunk < totalChunks; currentChunk++) {
-                        const start = currentChunk * CHUNK_SIZE;
-                        const end = Math.min(start + CHUNK_SIZE, file.size);
-                        const chunkBlob = file.slice(start, end);
-                        const arrayBuffer = await chunkBlob.arrayBuffer();
-                        const chunk = new Uint8Array(arrayBuffer);
-                        const isLast = (currentChunk === totalChunks - 1);
+                const start = currentChunk * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunkBlob = file.slice(start, end);
+                const arrayBuffer = await chunkBlob.arrayBuffer();
+                const chunk = new Uint8Array(arrayBuffer);
+                const isLast = (currentChunk === totalChunks - 1);
 
-                        const encrypted = encrypter.encrypt_chunk(chunk, isLast);
+                const encrypted = encrypter.encrypt_chunk(chunk, isLast);
 
                 const chunkRes = await fetch(`${cdnUrl}/uploads/${uploadId}/chunk`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/octet-stream' },
+                    headers: {'Content-Type': 'application/octet-stream'},
                     body: encrypted
                 });
 
                 if (!chunkRes.ok) throw new Error("Chunk upload failed");
 
-                        uploadedBytes += encrypted.length;
+                uploadedBytes += encrypted.length;
 
-                        const percent = (uploadedBytes / totalEncryptedSize) * 100;
-                        background.style.backgroundSize = percent + '% 100%';
-                        percentageElement.innerText = `${percent.toFixed(1)}%`;
+                const percent = (uploadedBytes / totalEncryptedSize) * 100;
+                background.style.backgroundSize = percent + '% 100%';
+                percentageElement.innerText = `${percent.toFixed(1)}%`;
 
-                        const now = Date.now();
-                        const elapsed = (now - last_progress) / 1000;
-                        const bytes_since_last = uploadedBytes - last_loaded;
-                        const speedBps = bytes_since_last / (elapsed || 0.01);
+                const now = Date.now();
+                const elapsed = (now - last_progress) / 1000;
+                const bytes_since_last = uploadedBytes - last_loaded;
+                const speedBps = bytes_since_last / (elapsed || 0.01);
 
-                        speedSamples.push(speedBps);
-                        if (speedSamples.length > maxSamples) speedSamples.shift();
-                        const averageSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
+                speedSamples.push(speedBps);
+                if (speedSamples.length > maxSamples) speedSamples.shift();
+                const averageSpeed = speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length;
 
-                        progresstext.innerText = `${(uploadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalEncryptedSize / 1024 / 1024).toFixed(1)}MB ${(averageSpeed / 1024 / 1024).toFixed(1)}MB/s`;
-                        last_progress = now;
-                        last_loaded = uploadedBytes;
-                        }
-                    encrypter.free();
+                progresstext.innerText = `${(uploadedBytes / 1024 / 1024).toFixed(1)}MB / ${(totalEncryptedSize / 1024 / 1024).toFixed(1)}MB ${(averageSpeed / 1024 / 1024).toFixed(1)}MB/s`;
+                last_progress = now;
+                last_loaded = uploadedBytes;
+            }
+            encrypter.free();
 
-            const finRes = await fetch(`${cdnUrl}/uploads/${uploadId}/finalize`, { method: 'POST' });
+            const finRes = await fetch(`${cdnUrl}/uploads/${uploadId}/finalize`, {method: 'POST'});
 
             if (finRes.ok) {
                 const responseText = await finRes.text();
@@ -313,7 +319,10 @@
                 throw new Error(`Server returned ${finRes.status}`);
             }
         } catch (err) {
-            try { if (typeof encrypter !== 'undefined') encrypter.free(); } catch(e) {}
+            try {
+                if (typeof encrypter !== 'undefined') encrypter.free();
+            } catch (e) {
+            }
             show_toast('Upload failed: ' + err.message, "error");
             background.style.backgroundSize = '0% 100%';
         }

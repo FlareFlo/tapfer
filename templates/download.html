@@ -86,12 +86,7 @@
             await init();
 
             let base64 = hash.replace(/-/g, '+').replace(/_/g, '/');
-            const file_size = {
-            {
-                file_size_bits
-            }
-        }
-            ;
+            const file_size = {{file_size_bits}};
             let progress = 0;
             while (base64.length % 4) {
                 base64 += '=';
@@ -209,12 +204,7 @@
 
     function main() {
         // Do not parse, as the server will set the expiry string properly
-        const realtime = {
-        {
-            unix_expiry
-        }
-    }
-        ;
+        const realtime = {{unix_expiry}};
         if (realtime == 0) {
             return;
         }

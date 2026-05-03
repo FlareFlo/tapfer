@@ -172,6 +172,10 @@
             downloadButton.innerText = "Download Failed";
         } finally {
             downloadButton.disabled = false;
+            window.is_downloading = false;
+            if (window.needs_reload_after_download) {
+                window.location.reload();
+            }
         }
     });
 </script>
@@ -241,8 +245,9 @@
         const payload = JSON.parse(e.data);
         switch (payload.event.key) {
             case "DeleteAsset":
-                if (!window.is_downloading) {
-                    // TODO: Delay until ready, then perform action instead of not doing it at all
+                if (window.is_downloading) {
+                    window.needs_reload_after_download = true;
+                } else {
                     window.location.reload();
                 }
                 break;

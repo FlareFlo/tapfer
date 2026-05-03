@@ -73,20 +73,22 @@
 				a file</a><span class="hide_deposit_mode"> or <a href="/deposit">upload to this device</a></span>
 			</div>
 
-			<!--			TODO: Add toggle for E2EE here-->
 			<form id="uploadForm">
-				<div style="display: flex; align-items: center; gap: 0.5rem;">
-					<p style="margin: 0;">Delete after:</p>
-
-					<label>
-						<input type="radio" name="expiration" value="single_download" id="del_1download" checked>
-						one download
-					</label>
-
-					<label>
-						<input type="radio" name="expiration" value="24_hours" id="del_24hours">
-						24 hours
-					</label>
+				<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; margin: 1.5rem 0;">
+					<div style="display: flex; align-items: center; gap: 0.5rem;">
+						<label for="expiration" style="margin: 0;">Expiration: </label>
+						<select name="expiration" id="expiration" style="padding: 0.2rem; border-radius: 4px;">
+							<option value="single_download" selected>one download</option>
+							<option value="24_hours">24 hours</option>
+						</select>
+					</div>
+					<div style="display: flex; align-items: center; gap: 0.5rem;">
+						<label for="encryption" style="margin: 0;">Privacy: </label>
+						<select name="encryption" id="encryption" style="padding: 0.2rem; border-radius: 4px;">
+							<option value="e2e" selected>E2E Encrypted</option>
+							<option value="none">Unencrypted</option>
+						</select>
+					</div>
 				</div>
 
 				<label>
@@ -96,7 +98,6 @@
 			</form>
 
 			<div class="hide-on-mobile">
-				Or use CURL <br>
 				<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;">curl -X POST
 					https://example.com<span class="show_deposit_mode">?deposit={deposit_id}</span> -F
 					file=@</code><code
@@ -209,18 +210,24 @@
         const file = fileInput.files[0];
         if (!file) return;
 
-        const encrypter = new FileEncrypter();
-        const key = encrypter.export_key();
-        const nonce = encrypter.export_nonce();
+        const isEncrypted = form.elements['encryption'].value === 'e2e';
 
-        const combinedSecret = new Uint8Array(40);
-        combinedSecret.set(key, 0);
-        combinedSecret.set(nonce, 32);
-        const secretString = encodeBase64Url(combinedSecret);
-
+        let encrypter, secretString = "";
+        let totalEncryptedSize = file.size;
         const CHUNK_SIZE = 1024 * 1024 * 10;
         const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
-        const totalEncryptedSize = file.size + (totalChunks * 16);
+
+        if (isEncrypted) {
+            encrypter = new FileEncrypter();
+            const key = encrypter.export_key();
+            const nonce = encrypter.export_nonce();
+
+            const combinedSecret = new Uint8Array(40);
+            combinedSecret.set(key, 0);
+            combinedSecret.set(nonce, 32);
+            secretString = encodeBase64Url(combinedSecret);
+            totalEncryptedSize = file.size + (totalChunks * 16);
+        }
 
         let cdnUrl = window.location.origin;
         if (window.location.hostname !== 'localhost') {
@@ -263,9 +270,9 @@
             if (!initRes.ok) throw new Error("Initialization failed");
             const uploadId = await initRes.text();
 
-            const fileUrl = `/uploads/${uploadId}#${secretString}`;
+            const fileUrl = isEncrypted ? `/uploads/${uploadId}#${secretString}` : `/uploads/${uploadId}`;
             download_url.href = fileUrl;
-            download_url.innerText = "Encrypted Link Ready";
+            download_url.innerText = isEncrypted ? "Encrypted Link Ready" : "Link Ready";
             const qrcode = document.getElementById('qrcode');
             qrcode.src = qr_base64_from_url(window.location.origin, fileUrl);
             qrcode.style.filter = 'none';
@@ -278,17 +285,22 @@
                 const chunk = new Uint8Array(arrayBuffer);
                 const isLast = (currentChunk === totalChunks - 1);
 
-                const encrypted = encrypter.encrypt_chunk(chunk, isLast);
+                let chunkToUpload;
+                if (isEncrypted) {
+                    chunkToUpload = encrypter.encrypt_chunk(chunk, isLast);
+                } else {
+                    chunkToUpload = chunk;
+                }
 
                 const chunkRes = await fetch(`${cdnUrl}/uploads/${uploadId}/chunk`, {
                     method: 'PATCH',
                     headers: {'Content-Type': 'application/octet-stream'},
-                    body: encrypted
+                    body: chunkToUpload
                 });
 
                 if (!chunkRes.ok) throw new Error("Chunk upload failed");
 
-                uploadedBytes += encrypted.length;
+                uploadedBytes += chunkToUpload.length;
 
                 const percent = (uploadedBytes / totalEncryptedSize) * 100;
                 background.style.backgroundSize = percent + '% 100%';
@@ -307,20 +319,20 @@
                 last_progress = now;
                 last_loaded = uploadedBytes;
             }
-            encrypter.free();
+            if (isEncrypted) encrypter.free();
 
             const finRes = await fetch(`${cdnUrl}/uploads/${uploadId}/finalize`, {method: 'POST'});
 
             if (finRes.ok) {
                 const responseText = await finRes.text();
                 console.log(`redirecting to ${responseText}`);
-                window.location.href = responseText + "#" + secretString;
+                window.location.href = isEncrypted ? responseText + "#" + secretString : responseText;
             } else {
                 throw new Error(`Server returned ${finRes.status}`);
             }
         } catch (err) {
             try {
-                if (typeof encrypter !== 'undefined') encrypter.free();
+                if (typeof encrypter !== 'undefined' && encrypter) encrypter.free();
             } catch (e) {
             }
             show_toast('Upload failed: ' + err.message, "error");

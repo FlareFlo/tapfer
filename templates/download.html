@@ -22,6 +22,16 @@
             white-space: nowrap;
             text-overflow: ellipsis;
         }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .curl-command {
+            user-select: all;
+            padding: 0.2rem 0 0.2rem 0.2rem;
+        }
 	</style>
 </head>
 <body>
@@ -37,7 +47,7 @@
 			<p id="sha512_box"><strong>Sha512:</strong> <a id="sha512_value" href="{{sha512url}}" target="_blank"
 			                                               rel="noreferrer">{{sha512}}</a></p>
 		</div>
-		<div style="display: flex; gap: 10px;">
+		<div class="action-buttons">
 			<button id="download_button" class="button">Download</button>
 			<form>
 				<button id="copy_link" type="button">Copy direct download link</button>
@@ -45,7 +55,7 @@
 			<button id="delete_button">Delete</button>
 		</div>
 		<div class="hide-on-mobile">
-			<code id="curl_command" style="user-select: all; padding: 0.2rem 0 0.2rem 0.2rem;"></code>
+			<code id="curl_command" class="curl-command"></code>
 			<script>const fmt = `curl -JLO# {{download_url}}`;
             document.getElementById("curl_command").innerText = fmt</script>
 		</div>

@@ -1,0 +1,5 @@
+target/
+tapfer_crypt/target/
+tapfer_crypt/pkg/
+data/
+.git/

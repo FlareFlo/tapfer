@@ -18,7 +18,6 @@ use crate::updown::upload_pool::UploadPool;
 use crate::websocket::{WsDestination, WsEvent};
 use axum::routing::{any};
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
-use dashmap::DashMap;
 use handlers::homepage;
 use http::HeaderValue;
 use std::process;
@@ -27,7 +26,6 @@ use std::thread;
 use std::time::Duration;
 use std::{env, fs};
 use structs::error::TapferResult;
-use structs::tapfer_id::TapferId;
 use tokio::time::sleep;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
@@ -38,8 +36,6 @@ use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
-
-pub static PROGRESS_TOKEN_LUT: LazyLock<DashMap<u32, TapferId>> = LazyLock::new(DashMap::new);
 pub static GLOBAL_RETENTION_POLICY: LazyLock<GlobalRetentionPolicy> =
     LazyLock::new(GlobalRetentionPolicy::default);
 pub static UPLOAD_POOL: LazyLock<UploadPool> = LazyLock::new(UploadPool::new);

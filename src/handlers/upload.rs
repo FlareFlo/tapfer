@@ -7,7 +7,7 @@ use crate::structs::tapfer_id::TapferId;
 use crate::updown::upload_handle::UploadHandle;
 use crate::updown::upload_pool::UploadFsm;
 use crate::websocket::WsEvent;
-use crate::{PROGRESS_TOKEN_LUT, UPLOAD_POOL, websocket};
+use crate::{UPLOAD_POOL, websocket};
 use axum::extract::multipart::Field;
 use axum::extract::{FromRequest, Multipart, Path, Query, Request};
 use axum::http::StatusCode;
@@ -17,7 +17,6 @@ use axum_extra::extract::Host;
 use dashmap::DashMap;
 use futures_util::StreamExt;
 use futures_util::TryStreamExt;
-use scopeguard::defer;
 use std::sync::LazyLock;
 use std::io::Error;
 use std::pin::{Pin, pin};
@@ -30,14 +29,13 @@ use tokio::{fs, task};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::io::StreamReader;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 static CHUNKED_UPLOADS: LazyLock<DashMap<TapferId, mpsc::Sender<Result<axum::body::Bytes, std::io::Error>>>> = LazyLock::new(DashMap::new);
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
     file_size: Option<u64>,
-    progress_token: Option<String>,
     expiration: Option<String>,
     timezone: Option<String>,
     deposit: Option<u64>,
@@ -95,11 +93,6 @@ async fn do_upload(
     let mut meta = FileMetaBuilder::default();
 
     let size: Option<u64> = params.file_size;
-    let in_progress_token: Option<u32> = params
-        .progress_token
-        .as_ref()
-        .map(|h| h.parse())
-        .transpose()?;
 
     if let Some(tz) = params.timezone.as_ref() {
         meta.timezone = Some(tz.to_owned());
@@ -107,24 +100,7 @@ async fn do_upload(
         error!("Missing tapfer-timezone parameter");
     }
 
-    if size.is_some() != in_progress_token.is_some() {
-        warn!(
-            "Size is {size:?} and progress token is {in_progress_token:?}. The frontend might not be sending both?"
-        );
-    }
-
     expiration_field(params.expiration.as_deref(), &mut meta)?;
-
-    if let Some(tok) = in_progress_token {
-        info!("Adding progress token {tok}");
-        PROGRESS_TOKEN_LUT.insert(tok, id);
-    }
-    defer! {
-        if let Some(t) = in_progress_token {
-            info!("deleting progress token {t}");
-            PROGRESS_TOKEN_LUT.remove(&t);
-        }
-    }
 
     // Notify waiting deposit that they can now view the entry
     if let Some(deposit) = params.deposit {
@@ -323,23 +299,6 @@ pub async fn finalize_chunked_upload(
 
     let method = if host.contains("localhost") { host = String::new(); "" } else { host = host.replace("cdn.", ""); "https://" };
     Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")))
-}
-
-#[utoipa::path(
-    get,
-    path = "/uploads/query_id/{token}",
-    responses(
-        (status = 200, description = "UUID of asset"),
-        (status = 404, description = "Token matches no (running) asset"),
-    ),
-
-)]
-pub async fn progress_token_to_id(Path(path): Path<String>) -> TapferResult<impl IntoResponse> {
-    let token = u32::from_str(&path)?;
-    Ok(PROGRESS_TOKEN_LUT
-        .get(&token)
-        .ok_or(TapferError::TokenDoesNotExist(token))?
-        .to_string())
 }
 
 pub struct UpdownWriter<S> {

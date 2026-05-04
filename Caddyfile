@@ -1,0 +1,8 @@
+# For local development purposes
+{
+	http_port 4080
+}
+
+localhost:4000 {
+	reverse_proxy localhost:3000
+}

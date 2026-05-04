@@ -42,13 +42,18 @@
             filter: blur(5px);
         }
 
-        #filelink {
-            border-bottom-style: dot-dot-dash;
+        .filelink {
             transition: color 0.5s ease;
+			border-radius: 5px;
+            padding: 0.5rem 1rem;
+            border: 2px dotted #2975D2;
+			color: #2975D2 !important;
+			text-decoration: none;
         }
 
-        #filelink:hover {
+        .filelink:hover {
             color: crimson;
+			text-decoration: underline;
         }
 
         .show_on_upload {
@@ -69,21 +74,20 @@
 	<div class="form-box" id="uploadBox">
 		<div class="container">
 			<div>
-				Drop file anywhere, <a id="filelink" href="javascript:document.getElementById('file_input').click();">select
-				a file</a><span class="hide_deposit_mode"> or <a href="/deposit">upload to this device</a></span>
+				<a id="filelink" class="filelink" href="javascript:document.getElementById('file_input').click();">Select / drop file</a><span class="hide_deposit_mode"> or <a class="filelink" href="/deposit">Upload from phone</a></span>
 			</div>
 
 			<form id="uploadForm">
-				<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; margin: 1.5rem 0;">
-					<div style="display: flex; align-items: center; gap: 0.5rem;">
-						<label for="expiration" style="margin: 0;">Expiration: </label>
+				<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1rem; margin: 0.5rem 0;">
+					<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem;">
+						<label for="expiration" style="margin: 0;">Expiration</label>
 						<select name="expiration" id="expiration" style="padding: 0.2rem; border-radius: 4px;">
 							<option value="single_download" selected>one download</option>
 							<option value="24_hours">24 hours</option>
 						</select>
 					</div>
-					<div style="display: flex; align-items: center; gap: 0.5rem;">
-						<label for="encryption" style="margin: 0;">Privacy: </label>
+					<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem;">
+						<label for="encryption" style="margin: 0;">Privacy</label>
 						<select name="encryption" id="encryption" style="padding: 0.2rem; border-radius: 4px;">
 							<option value="e2e" selected>E2E Encrypted</option>
 							<option value="none">Unencrypted</option>

@@ -16,13 +16,15 @@ pub struct Deposit {
     qr_size: usize,
     qr_b64: String,
     ws_url: String,
+    upload_url: String,
 }
 
 pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
     let deposit_id = Uuid::new_v4().as_u64_pair().0; // Hacky? Sure. But this avoids another RNG library that we use once
+    let url = format!("https://{host}?deposit={deposit_id}");
 
     let qr_code = qrcode_generator::to_png_to_vec_from_str(
-        format!("https://{host}?deposit={deposit_id}",),
+        &url,
         QR_CODE_ECC,
         QR_CODE_SIZE,
     )?;
@@ -32,6 +34,7 @@ pub async fn show_form(Host(host): Host) -> TapferResult<impl IntoResponse> {
         embed_description: EMBED_DESCRIPTION,
         qr_size: QR_CODE_SIZE,
         qr_b64: BASE64_STANDARD.encode(&qr_code),
+        upload_url: url,
         ws_url: format!(
             "wss://{host}/deposit/ws?deposit={deposit_id}",
         ),

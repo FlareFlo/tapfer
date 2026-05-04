@@ -140,6 +140,8 @@
     const percentageElement = document.getElementById('blurred-percentage');
     const form = document.getElementById('uploadForm');
     const fileinput = document.getElementById("file_input");
+    const current_params = new URLSearchParams(window.location.search);
+    const deposit_mode = current_params.has("deposit");
 
     // Base64URL encoding helper
     function encodeBase64Url(uint8Array) {
@@ -148,8 +150,7 @@
     }
 
     // Hide/show elements when deposit mode is enabled
-    const current_params = new URLSearchParams(window.location.search);
-    if (current_params.has("deposit")) {
+    if (deposit_mode) {
         const hide_elems = document.querySelectorAll('.hide_deposit_mode');
 
         hide_elems.forEach(element => {
@@ -159,8 +160,17 @@
         const show_elems = document.querySelectorAll('.show_deposit_mode');
 
         show_elems.forEach(element => {
-            element.style.display = 'display-block';
+            element.style.display = 'block';
         });
+        
+        // In deposit mode, its currently not possible to transfer the key securely to the target.
+		// So we will disable E2EE and default to plain.
+		// TODO: Think about ways how to get the key to the receiver
+        const enc = document.getElementById('encryption');
+        enc.value = 'none';
+        const opt = enc.querySelector('option[value="e2e"]');
+        opt.disabled = true;
+        opt.title = "E2E encryption is currently not supported in deposit mode";
     }
 
     copylink_button.addEventListener("click", () => {
@@ -249,8 +259,7 @@
             "filename": file.name
         });
         // Forward deposit ID
-        const current_params = new URLSearchParams(window.location.search);
-        if (current_params.has("deposit")) {
+        if (deposit_mode) {
             params.append("deposit", current_params.get("deposit"));
         }
 

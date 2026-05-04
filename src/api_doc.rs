@@ -6,12 +6,7 @@ use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(
-        accept_form,
-        download_file,
-        request_delete_asset,
-        get_qrcode_from_id
-    ),
+    paths(accept_form, download_file, request_delete_asset, get_qrcode_from_id),
     info(title = "Tapfer API", version = "1.0")
 )]
 pub struct ApiDoc;

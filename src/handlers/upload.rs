@@ -1,4 +1,3 @@
-use crate::handlers::not_found::{redirect_not_found, Reason404};
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::handlers::checksum;
 use crate::retention_control::delete_asset;
@@ -12,27 +11,29 @@ use crate::{UPLOAD_POOL, websocket};
 use axum::extract::multipart::Field;
 use axum::extract::{FromRequest, Multipart, Path, Query, Request};
 use axum::http::StatusCode;
-use axum::response::{Html, Redirect};
+use axum::response::Html;
 use axum::response::IntoResponse;
 use axum_extra::extract::Host;
 use dashmap::DashMap;
 use futures_util::StreamExt;
 use futures_util::TryStreamExt;
-use std::sync::LazyLock;
 use std::io::Error;
 use std::pin::{Pin, pin};
 use std::str::FromStr;
+use std::sync::LazyLock;
 use std::task::{Context, Poll};
 use time::Duration as TimeDuration;
 use tokio::fs::File;
 use tokio::io::{AsyncWrite, BufReader, copy_buf};
-use tokio::{fs, task};
 use tokio::sync::mpsc;
+use tokio::{fs, task};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::io::StreamReader;
 use tracing::{error, info};
 
-static CHUNKED_UPLOADS: LazyLock<DashMap<TapferId, mpsc::Sender<Result<axum::body::Bytes, std::io::Error>>>> = LazyLock::new(DashMap::new);
+static CHUNKED_UPLOADS: LazyLock<
+    DashMap<TapferId, mpsc::Sender<Result<axum::body::Bytes, std::io::Error>>>,
+> = LazyLock::new(DashMap::new);
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct UploadParameters {
@@ -86,11 +87,7 @@ pub async fn accept_form(
     Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")))
 }
 
-async fn do_upload(
-    req: Request,
-    id: TapferId,
-    params: &UploadParameters,
-) -> TapferResult<()> {
+async fn do_upload(req: Request, id: TapferId, params: &UploadParameters) -> TapferResult<()> {
     let mut meta = FileMetaBuilder::default();
 
     let size: Option<u64> = params.file_size;
@@ -121,12 +118,17 @@ async fn do_upload(
             .map_err(|_| TapferError::MultipartFieldNameMissing)?;
 
         while let Some(field) = multipart.next_field().await? {
-            let name = field.name().ok_or(TapferError::MultipartFieldNameMissing)?.to_string();
+            let name = field
+                .name()
+                .ok_or(TapferError::MultipartFieldNameMissing)?
+                .to_string();
             if name.as_str() == "file" {
                 payload_field(field, id, meta.clone(), size).await?;
             } else {
                 error!("Got unexpected form field {name}");
-                Err(TapferError::UnknownMultipartField { field_name: name.clone() })?;
+                Err(TapferError::UnknownMultipartField {
+                    field_name: name.clone(),
+                })?;
             }
         }
     } else {
@@ -145,14 +147,20 @@ async fn do_upload(
 
         let mut s = BufReader::with_capacity(
             UPLOAD_BUFSIZE,
-            StreamReader::new(req.into_body().into_data_stream().map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-            })),
+            StreamReader::new(
+                req.into_body()
+                    .into_data_stream()
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())),
+            ),
         );
         copy_buf(&mut s, &mut f).await?;
 
         let metadata = f.metadata();
-        fs::write(format!("data/{id}/meta.toml"), toml::to_string_pretty(&metadata)?.as_bytes()).await?;
+        fs::write(
+            format!("data/{id}/meta.toml"),
+            toml::to_string_pretty(&metadata)?.as_bytes(),
+        )
+        .await?;
 
         handle.write_fsm().await.mark_complete();
         websocket::broadcast_event(id, WsEvent::UploadComplete)?;
@@ -248,16 +256,19 @@ pub async fn init_chunked_upload(
     CHUNKED_UPLOADS.insert(id, tx);
 
     tokio::spawn(async move {
-        let mut s = BufReader::with_capacity(
-            UPLOAD_BUFSIZE,
-            StreamReader::new(ReceiverStream::new(rx)),
-        );
+        let mut s =
+            BufReader::with_capacity(UPLOAD_BUFSIZE, StreamReader::new(ReceiverStream::new(rx)));
         if let Err(e) = copy_buf(&mut s, &mut f).await {
             error!("Chunked upload error for {id}: {e}");
             return;
         }
         let metadata = f.metadata();
-        if let Err(e) = fs::write(format!("data/{id}/meta.toml"), toml::to_string_pretty(&metadata).unwrap().as_bytes()).await {
+        if let Err(e) = fs::write(
+            format!("data/{id}/meta.toml"),
+            toml::to_string_pretty(&metadata).unwrap().as_bytes(),
+        )
+        .await
+        {
             error!("Failed to write meta for {id}: {e}");
         }
         handle.write_fsm().await.mark_complete();
@@ -275,13 +286,20 @@ pub async fn upload_chunk(
 ) -> TapferResult<impl IntoResponse> {
     let id = TapferId::from_str(&id_str)?;
     // Using TokenDoesNotExist error for convenience as it yields a 404
-    let tx = CHUNKED_UPLOADS.get(&id).ok_or(TapferError::TokenDoesNotExist(0))?.clone();
+    let tx = CHUNKED_UPLOADS
+        .get(&id)
+        .ok_or(TapferError::TokenDoesNotExist(0))?
+        .clone();
 
     let mut stream = req.into_body().into_data_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        let chunk =
+            chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
         if tx.send(Ok(chunk)).await.is_err() {
-            return Err(TapferError::Custom { status_code: StatusCode::BAD_REQUEST, body: Html("Upload aborted".to_string())});
+            return Err(TapferError::Custom {
+                status_code: StatusCode::BAD_REQUEST,
+                body: Html("Upload aborted".to_string()),
+            });
         }
     }
     Ok(StatusCode::OK)
@@ -295,10 +313,19 @@ pub async fn finalize_chunked_upload(
     let id = TapferId::from_str(&id_str)?;
 
     if CHUNKED_UPLOADS.remove(&id).is_none() {
-        return Err(TapferError::Custom { status_code: StatusCode::INTERNAL_SERVER_ERROR, body: Html("Finalizing unknown upload?!".to_owned()) });
+        return Err(TapferError::Custom {
+            status_code: StatusCode::INTERNAL_SERVER_ERROR,
+            body: Html("Finalizing unknown upload?!".to_owned()),
+        });
     }
 
-    let method = if host.contains("localhost") { host = String::new(); "" } else { host = host.replace("cdn.", ""); "https://" };
+    let method = if host.contains("localhost") {
+        host = String::new();
+        ""
+    } else {
+        host = host.replace("cdn.", "");
+        "https://"
+    };
     Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")).into_response())
 }
 

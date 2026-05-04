@@ -1,12 +1,9 @@
 use crate::UPLOAD_POOL;
 use crate::handlers::download::UpDownFsm;
-use crate::handlers::not_found::{NotFound, Reason404};
+use crate::handlers::not_found::Reason404;
 use crate::structs::error::{TapferError, TapferResult};
 use crate::structs::file_meta::FileMeta;
 use crate::structs::tapfer_id::TapferId;
-use askama::Template;
-use axum::http::StatusCode;
-use axum::response::Html;
 use std::str::FromStr;
 use tokio::fs;
 

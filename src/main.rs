@@ -16,7 +16,7 @@ use crate::retention_control::{GlobalRetentionPolicy, check_all_assets};
 use crate::structs::error::TapferErrorExt;
 use crate::updown::upload_pool::UploadPool;
 use crate::websocket::{WsDestination, WsEvent};
-use axum::routing::{any};
+use axum::routing::any;
 use axum::{Router, extract::DefaultBodyLimit, middleware, routing::get};
 use handlers::homepage;
 use http::HeaderValue;
@@ -89,9 +89,18 @@ async fn main() -> TapferResult<()> {
         .route("/", get(homepage::show_form).post(upload::accept_form))
         .route("/deposit", get(deposit::show_form))
         .route("/deposit/ws", any(deposit::start_ws))
-        .route("/upload/init", axum::routing::post(handlers::upload::init_chunked_upload))
-        .route("/uploads/{id}/chunk", axum::routing::patch(handlers::upload::upload_chunk))
-        .route("/uploads/{id}/finalize", axum::routing::post(handlers::upload::finalize_chunked_upload))
+        .route(
+            "/upload/init",
+            axum::routing::post(handlers::upload::init_chunked_upload),
+        )
+        .route(
+            "/uploads/{id}/chunk",
+            axum::routing::patch(handlers::upload::upload_chunk),
+        )
+        .route(
+            "/uploads/{id}/finalize",
+            axum::routing::post(handlers::upload::finalize_chunked_upload),
+        )
         .route(
             "/uploads/{id}/download",
             get(handlers::download::download_file),

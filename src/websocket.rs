@@ -1,10 +1,10 @@
-use std::fmt::Display;
 use crate::structs::error::TapferResult;
 use crate::structs::tapfer_id::TapferId;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, WebSocketUpgrade};
 use axum::response::Response;
 use dashmap::DashMap;
+use std::fmt::Display;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast::WeakSender;
@@ -66,7 +66,10 @@ pub async fn start_ws(Path(id): Path<Uuid>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, id))
 }
 
-pub(crate) async fn handle_socket(mut socket: WebSocket, dst: impl Into<WsDestination> + Copy + Display) {
+pub(crate) async fn handle_socket(
+    mut socket: WebSocket,
+    dst: impl Into<WsDestination> + Copy + Display,
+) {
     let mut tx_seq = 0;
     let (_tx, mut rx) = if let Some(tx) = WS_MAP.get(&dst.into()).and_then(|rx| rx.upgrade()) {
         (tx.clone(), tx.subscribe())

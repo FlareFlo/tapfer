@@ -9,7 +9,7 @@ use std::str::FromStr;
 use time::{Duration, UtcDateTime};
 use tokio::fs;
 use tokio::fs::remove_dir_all;
-use tracing::{info};
+use tracing::info;
 
 pub struct GlobalRetentionPolicy {
     pub maximum_age: Duration,
@@ -46,7 +46,7 @@ pub async fn delete_asset(asset: TapferId) -> TapferResult<()> {
 pub async fn check_all_assets() -> TapferResult<()> {
     let now = UtcDateTime::now();
     let mut dir = fs::read_dir("data").await?;
-    while let Some(entry) =  dir.next_entry().await? {
+    while let Some(entry) = dir.next_entry().await? {
         let file_meta = match entry.metadata().await {
             Ok(m) => m,
             e => {
@@ -61,8 +61,11 @@ pub async fn check_all_assets() -> TapferResult<()> {
         let mut path = entry.path().to_path_buf();
         path.push("meta.toml");
         let id = match TapferId::from_str(&entry.file_name().to_string_lossy()) {
-            Ok(t) => {t}
-            e => {e.log_error(&format!("Failed get ID from {}", path.display())); continue}
+            Ok(t) => t,
+            e => {
+                e.log_error(&format!("Failed get ID from {}", path.display()));
+                continue;
+            }
         };
 
         if let Ok(meta) = FileMeta::read_from_id(id).await {

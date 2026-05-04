@@ -10,6 +10,7 @@ use std::io;
 use std::num::ParseIntError;
 use time::error::Format;
 use tracing::error;
+use crate::handlers::not_found::{redirect_not_found, Reason404};
 
 pub type TapferResult<T> = Result<T, TapferError>;
 
@@ -80,6 +81,9 @@ pub enum TapferError {
 
     #[error(transparent)]
     Http(#[from] http::Error),
+
+    #[error("asset not found")]
+    NotFound(Reason404),
 }
 
 impl IntoResponse for TapferError {
@@ -119,6 +123,7 @@ impl IntoResponse for TapferError {
             UploadHandleSize(_) => generic("upload handle size"),
             TryFromSlice(_) => generic("try from slice"),
             Http(_) => generic("http"),
+            NotFound(reason) => redirect_not_found(reason).into_response(),
         }
     }
 }

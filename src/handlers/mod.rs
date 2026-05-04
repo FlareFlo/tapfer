@@ -1,6 +1,6 @@
 use crate::UPLOAD_POOL;
 use crate::handlers::download::UpDownFsm;
-use crate::handlers::not_found::NotFound;
+use crate::handlers::not_found::{NotFound, Reason404};
 use crate::structs::error::{TapferError, TapferResult};
 use crate::structs::file_meta::FileMeta;
 use crate::structs::tapfer_id::TapferId;
@@ -33,10 +33,7 @@ async fn get_any_meta(path: &String) -> TapferResult<((TapferId, FileMeta), UpDo
             match UPLOAD_POOL.uploads.get(&id) {
                 // The upload is not in progress either, so it does not exist
                 None => {
-                    return Err(TapferError::Custom {
-                        status_code: StatusCode::NOT_FOUND,
-                        body: Html(NotFound::default().render()?),
-                    });
+                    return Err(TapferError::NotFound(Reason404::Deleted));
                 }
                 // The upload is in-progress
                 Some(handle) => {

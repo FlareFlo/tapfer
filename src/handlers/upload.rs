@@ -1,3 +1,4 @@
+use crate::handlers::not_found::{redirect_not_found, Reason404};
 use crate::configuration::UPLOAD_BUFSIZE;
 use crate::handlers::checksum;
 use crate::retention_control::delete_asset;
@@ -11,7 +12,7 @@ use crate::{UPLOAD_POOL, websocket};
 use axum::extract::multipart::Field;
 use axum::extract::{FromRequest, Multipart, Path, Query, Request};
 use axum::http::StatusCode;
-use axum::response::Html;
+use axum::response::{Html, Redirect};
 use axum::response::IntoResponse;
 use axum_extra::extract::Host;
 use dashmap::DashMap;
@@ -294,11 +295,11 @@ pub async fn finalize_chunked_upload(
     let id = TapferId::from_str(&id_str)?;
 
     if CHUNKED_UPLOADS.remove(&id).is_none() {
-         return Err(TapferError::Custom { status_code: StatusCode::NOT_FOUND, body: Html("Upload session not found".to_string()) });
+        return Err(TapferError::Custom { status_code: StatusCode::INTERNAL_SERVER_ERROR, body: Html("Finalizing unknown upload?!".to_owned()) });
     }
 
     let method = if host.contains("localhost") { host = String::new(); "" } else { host = host.replace("cdn.", ""); "https://" };
-    Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")))
+    Ok((StatusCode::OK, format!("{method}{host}/uploads/{id}\n")).into_response())
 }
 
 pub struct UpdownWriter<S> {

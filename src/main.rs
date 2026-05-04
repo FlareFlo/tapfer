@@ -76,6 +76,7 @@ async fn main() -> TapferResult<()> {
             "/uploads/{id}",
             get(handlers::download::download_html).delete(handlers::delete::request_delete_asset),
         )
+        .fallback(handlers::not_found::not_found_handler)
         .layer(cors.clone());
 
     let fallback_service = ServiceBuilder::new()

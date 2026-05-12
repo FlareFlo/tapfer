@@ -41,6 +41,7 @@ struct DownloadTemplate<'a> {
     embed_image_url: &'a str,
     qr_size: usize,
     embed_description: &'a str,
+    embed_title: &'a str,
     delete_url: &'a str,
     qr_b64: String,
     unix_expiry: i64,
@@ -83,6 +84,7 @@ pub async fn download_html(
         embed_image_url: &format!("/qrcg/{id}"),
         qr_size: QR_CODE_SIZE,
         embed_description: EMBED_DESCRIPTION,
+        embed_title: meta.name(),
         delete_url: &format!("/uploads/{id}"),
         qr_b64: base64_qr_from_id(id, &host)?,
         unix_expiry: meta

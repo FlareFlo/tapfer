@@ -1,4 +1,4 @@
-use crate::configuration::{EMBED_DESCRIPTION, FAVICON};
+use crate::configuration::{EMBED_DESCRIPTION, EMBED_TITLE, FAVICON};
 use askama::Template;
 
 #[derive(Template)]
@@ -6,6 +6,7 @@ use askama::Template;
 pub struct NotFound {
     embed_image_url: &'static str,
     embed_description: &'static str,
+    embed_title: &'static str,
 }
 
 impl Default for NotFound {
@@ -13,6 +14,7 @@ impl Default for NotFound {
         Self {
             embed_image_url: FAVICON,
             embed_description: EMBED_DESCRIPTION,
+            embed_title: EMBED_TITLE,
         }
     }
 }

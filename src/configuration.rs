@@ -31,4 +31,6 @@ pub const QR_CODE_ECC: QrCodeEcc = QrCodeEcc::Medium;
 
 pub const EMBED_DESCRIPTION: &str = "fast self-hosted file transfer";
 
+pub const EMBED_TITLE: &str = "Tapfer";
+
 pub const FAVICON: &str = "/static/favicon.ico";
